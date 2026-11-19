@@ -134,7 +134,7 @@ void dsp_drone_set(uint8_t root_midi, uint8_t third_midi, uint8_t fifth_midi, ui
     g_drone_inc3 = t_inc - (t_inc / 800u); /* -0.12% lush chorus 3rd */
     g_drone_third_en = third_en;
     g_drone_fifth_en = fifth_en;
-    g_drone_level_q15 = (int32_t)level * 128; /* Warm, clear backing chord bed */
+    g_drone_level_q15 = (int32_t)level * 168; /* Present, warm backing chord bed */
 }
 
 static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -422,10 +422,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix with clean headroom (>> 1) so soft_clip_q15 doesn't squash dynamics or chords */
+    /* Stereo mix with clean headroom (>> 1); Fighter & Cleric balanced, backing chords raised */
     int32_t p_mix = (pl >> 1) + (ph >> 2);
-    int32_t bg_mix = ((drone * 3) >> 2) + p_mix;
-    int32_t pv[3] = { v0, (v1 >> 1) + (v1 >> 3), (v2 >> 1) + (v2 >> 3) };
+    int32_t bg_mix = drone + p_mix;
+    int32_t pv[3] = { (v0 * 7) >> 3, (v1 * 7) >> 3, (v2 * 5) >> 3 };
     if (g_state.capture.active || g_state.held_keys_mask != 0u) {
         bg_mix >>= 2;
         uint8_t act = g_state.next_slot % 3u;

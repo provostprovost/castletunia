@@ -389,11 +389,12 @@ void seed_commit_capture(void)
     g_state.tick_in_16th = 0u;
     g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
     /* Launch exact number of flying music notes at Boss (no chime SFX) */
+    uint8_t mir = g_state.spells.mirror_active;
     for (uint8_t i = 0; i < count && i < MAX_SEED_NOTES; i++) {
         int16_t y0 = (int16_t)(38 + (int)s * 44);
-        g_state.note_fx[i].x = 172;
+        g_state.note_fx[i].x = mir ? 64 : 172;
         g_state.note_fx[i].y = y0;
-        g_state.note_fx[i].vx = -7;
+        g_state.note_fx[i].vx = mir ? 7 : -7;
         g_state.note_fx[i].vy = (int16_t)((72 - y0) / 15);
         g_state.note_fx[i].slot = s;
         g_state.note_fx[i].delay = (uint8_t)(i * 3u);

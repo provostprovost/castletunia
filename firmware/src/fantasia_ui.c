@@ -97,14 +97,16 @@ static void render_battle_sprites(void)
     uint8_t z = g_state.settings.zone_id % 9u;
     uint8_t mirror = g_state.spells.mirror_active;
 
-    /* 1. Boss on left/center (x=16..111, wider during counter-attack lunge) */
-    int bx = 16;
+    /* 1. Boss on left (normal) or right facing left (mirror) */
+    int boss_lane_w = (g_state.boss_atk_timer > 0u) ? 116 : 96;
+    int boss_lane_x = mirror ? (g_state.boss_atk_timer > 0u ? 108 : 128) : 16;
+    int bx = mirror ? 128 : 16;
     if (g_state.boss_atk_timer > 0u) {
-        bx += (g_state.boss_atk_timer > 24u) ? 18 : ((g_state.boss_atk_timer > 12u) ? 12 : 5);
+        int atk_lunge = (g_state.boss_atk_timer > 24u) ? 18 : ((g_state.boss_atk_timer > 12u) ? 12 : 5);
+        bx += mirror ? -atk_lunge : atk_lunge;
     } else if (g_state.boss_hit_timer > 0u) {
         bx += (g_state.boss_hit_timer & 1u) ? -3 : 3;
     }
-    int boss_lane_w = (g_state.boss_atk_timer > 0u) ? 116 : 96;
     int by_base = 34;
     int by = by_base + boss_hover_dy(g_boss_phase);
 
@@ -113,7 +115,7 @@ static void render_battle_sprites(void)
             int sy_scr = (by_base - 4) + strip + r;
             int rip = boss_atk_ripple_dx(sy_scr);
             for (int c = 0; c < boss_lane_w; c++) {
-                int sx_scr = 16 + c;
+                int sx_scr = boss_lane_x + c;
                 uint16_t bg = apply_boss_atk_fx(
                     sample_diorama_px(z, (sx_scr + rip) >> 1, sy_scr >> 1, mirror), z);
                 int b_x = sx_scr - bx;
@@ -144,12 +146,13 @@ static void render_battle_sprites(void)
                 g_sprite_buf[r * boss_lane_w + c] = bg;
             }
         }
-        hal_lcd_blit_rect(16, (by_base - 4) + strip, boss_lane_w, 4, g_sprite_buf);
+        hal_lcd_blit_rect(boss_lane_x, (by_base - 4) + strip, boss_lane_w, 4, g_sprite_buf);
     }
 
-    /* 2. Staggered FFVI Party Column on right (ABOVE the blue menu bar) */
-    static const int BASE_X[3] = {174, 182, 190};
-    static const int BASE_Y[3] = {24, 68, 112};
+    /* 2. Staggered FFVI Party Column on right (normal) or left facing right (mirror) */
+    static const int BASE_X[3]   = {174, 182, 190};
+    static const int BASE_X_M[3] = {24, 16, 8};
+    static const int BASE_Y[3]   = {24, 68, 112};
     int party_recoil = (g_state.boss_atk_timer > 20u) ? 4 : ((g_state.boss_atk_timer > 8u) ? 2 : 0);
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         uint8_t atk_t = g_state.attack_timer[s];
@@ -165,10 +168,12 @@ static void render_battle_sprites(void)
         } else if (party_recoil > 0) {
             lunge = party_recoil;
         }
+        if (mirror) lunge = -lunge;
         int hop = (g_state.slots[s].anim_timer > 0u && atk_t == 0u) ? -2 : 0;
-        int lane_x = BASE_X[s] - 32; /* 78px wide lane covers lunge + recoil */
+        int base_x = mirror ? BASE_X_M[s] : BASE_X[s];
+        int lane_x = mirror ? (base_x - 4) : (base_x - 32); /* 78px wide lane covers lunge + recoil */
         int lane_y = BASE_Y[s] - 2;
-        int sx0 = BASE_X[s] + lunge;
+        int sx0 = base_x + lunge;
 
         for (int strip = 0; strip < 44; strip += 4) {
             for (int r = 0; r < 4; r++) {
@@ -181,7 +186,8 @@ static void render_battle_sprites(void)
                     int sp_x = px_scr - sx0;
                     int sp_y = sy_scr - (BASE_Y[s] + hop);
                     if (sp_x >= 0 && sp_x < 42 && sp_y >= 0 && sp_y < 42) {
-                        uint32_t idx = (uint32_t)sp_y * 42u + (uint32_t)sp_x;
+                        int sp_sx = mirror ? (41 - sp_x) : sp_x;
+                        uint32_t idx = (uint32_t)sp_y * 42u + (uint32_t)sp_sx;
                         uint8_t packed = spr[idx >> 1];
                         uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                         if (ci != 0u) bg = pal[ci];
@@ -370,16 +376,7 @@ static void render_party_row(uint8_t s, int row_y)
         badge[0]='F'; badge[1]='R'; badge[2]='Z'; badge[3]='\0';
         bcol = 0x5E7Fu;
     } else if (g_state.slots[s].note_count > 0u) {
-        uint8_t len = (g_state.settings.weave > 65u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
-        badge[0] = (g_state.settings.weave > 65u) ? 'W' : 'L';
-        if (len >= 10u) {
-            badge[1] = (char)('0' + (len / 10u));
-            badge[2] = (char)('0' + (len % 10u));
-            badge[3] = '\0';
-        } else {
-            badge[1] = (char)('0' + len);
-            badge[2] = '\0';
-        }
+        badge[0]='A'; badge[1]='C'; badge[2]='T'; badge[3]='\0';
         bcol = 0x87F0u;
     } else {
         badge[0]='R'; badge[1]='D'; badge[2]='Y'; badge[3]='\0';
@@ -480,7 +477,7 @@ static void render_note_projectiles(void)
         }
         np->x += np->vx;
         np->y += np->vy;
-        if (np->x <= 72) {
+        if ((np->vx < 0 && np->x <= 72) || (np->vx > 0 && np->x >= 164)) {
             np->active = 0u;
             g_state.boss_hit_timer = 5u;
         }
