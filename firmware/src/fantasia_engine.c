@@ -269,13 +269,20 @@ void seed_commit_capture(void)
 
     uint16_t used_steps = 0u;
     uint32_t max_step = 0u;
+    uint32_t span = (count > 1u) ? g_state.capture.rel_tick[count - 1u] : 0u;
     for (uint8_t i = 0; i < count; i++) {
-        uint32_t step = (i == 0u && g_state.capture.rel_tick[0] < 6u)
-                      ? 0u
-                      : ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
+        uint32_t step;
+        if (count == 1u) {
+            step = 0u;
+        } else if (span > 0u && span < 48u) {
+            /* Spread quick phrases rhythmically across the 16-step bar instead of bunching at beat 1 */
+            step = (g_state.capture.rel_tick[i] * 12u) / span;
+        } else {
+            step = ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
+        }
         /* Nudge to next free 16th step so no played note is ever dropped */
         for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
-            step = (step + 1u) % 16u;
+            step = (step + 2u) % 16u;
         }
         used_steps |= (uint16_t)(1u << step);
         if (step > max_step) max_step = step;
@@ -284,7 +291,7 @@ void seed_commit_capture(void)
     }
 
     ns.note_count = count;
-    ns.base_length = (count <= 3u && max_step < 8u) ? 16u : 32u;
+    ns.base_length = 16u;
     static const uint8_t WEAVE_LENS[3][2] = { {7u, 11u}, {11u, 13u}, {13u, 17u} };
     ns.weave_length = WEAVE_LENS[s][engine_prng() & 1u];
     ns.playhead = 0u;
@@ -558,9 +565,11 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     SeedSlot *sl = &g_state.slots[s];
     if (sl->note_count == 0u) return;
 
+    /* Stagger Party slots in call-and-response (Fighter=0, Cleric=+4, Sorceress=+8) */
+    static const uint8_t SLOT_OFFSET[3] = {0u, 4u, 8u};
     uint8_t len = (g_state.settings.weave > 40u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
-    uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step) % len);
+    uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
 
     /* Wrap detection -> Drift & Cross-pollination decay */
     if (pos == 0u) {
