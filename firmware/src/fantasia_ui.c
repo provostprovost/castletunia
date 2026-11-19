@@ -505,7 +505,10 @@ void ui_render(void)
         }
         g_state.dirty_diorama = 0u;
         if (nfx && !any_note_fx_active()) g_state.dirty_diorama = 1u;
-        if (g_state.slide_frames > 0u) g_state.slide_frames--;
+        if (g_state.slide_frames > 0u) {
+            g_state.slide_frames--;
+            if (g_state.slide_frames == 0u) g_state.dirty_diorama = 1u;
+        }
         if (g_state.shake_timer > 0u) g_state.shake_timer--;
         if (g_state.toll_ring_timer > 0u) g_state.toll_ring_timer--;
         if (g_state.boss_atk_timer > 0u) {
