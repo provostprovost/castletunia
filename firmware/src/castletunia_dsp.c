@@ -199,7 +199,7 @@ void dsp_boss_attack_sfx(uint8_t zone_id)
         {9, 2, 46000, 14000, 64, 31600, 0, 29000}, /* 1 Tavern (Mimic): crunching brawl snap */
         {4, 3, 38000,  8000, 64, 32300, 3, 27000}, /* 2 Glade (Treant): woody overgrow chime */
         {3, 2, 52000, 10000, 64, 32400, 5, 28000}, /* 3 Castle (Vampire): dark blood moon organ */
-        {11, 2, 42000, 12000, 64, 32100, 6, 26000}, /* 4 Sands (Djinn): metallic sandstorm */
+        {11, 2, 42000, 12000, 64, 32100, 6, 26000}, /* 4 Sands (Anubis): metallic sandstorm */
         {7, 5, 56000,  6000, 64, 32450, 8, 25000}, /* 5 Spire (Beholder): alien warp beam */
         {5, 4, 48000,  3000, 64, 32550, 2, 26000}, /* 6 Tundra (Wyrm): crystalline frost shatter */
         {2, 1, 34000,  2000, 64, 32450, 2, 29000}, /* 7 Coronation (Seraph): radiant judgment brass */

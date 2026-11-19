@@ -410,9 +410,15 @@ void seed_commit_capture(void)
     };
     engine_set_ticker(ATK_MSG[s]);
 
-    /* Arm Boss Counter-Attack 2-beat drum buildup once all 3 Party members have finished their turn */
-    if (s == 2u && g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u) {
-        g_state.boss_buildup_steps = 8u;
+    /* Arm Boss Counter-Attack 3-beat drum buildup according to each Boss's turn cooldown */
+    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u && g_state.slots[2].note_count > 0u) {
+        static const uint8_t BOSS_CD[9] = { 4u, 4u, 5u, 3u, 3u, 4u, 4u, 4u, 5u };
+        uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
+        g_state.boss_turn_cnt++;
+        if (g_state.boss_turn_cnt >= BOSS_CD[sg]) {
+            g_state.boss_turn_cnt = 0u;
+            g_state.boss_buildup_steps = 12u;
+        }
     }
 }
 
@@ -765,14 +771,16 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 break;
             }
         }
-        /* Density blooming (65..100%) adds gentle stepwise passing tones */
+        /* Density blooming (65..100%) adds gentle stepwise passing tones (or lush Overgrow cascades for Treant) */
         if (deg < 0 && eff_density >= 65u) {
-            if ((engine_prng() % 100u) < (uint32_t)(eff_density - 58u)) {
+            uint8_t chance = (boss_active && zc == 2u) ? 55u : (uint8_t)(eff_density - 58u);
+            if ((engine_prng() % 100u) < chance) {
                 static const int8_t ORN[3] = {1, -1, 2};
+                static const int8_t OVERGROW[3] = {2, 4, 7};
                 int8_t base = sl->scale_deg[0];
                 if (base >= 0) {
-                    deg = base + ORN[engine_prng() % 3u];
-                    vel_pct = 65u;
+                    deg = base + ((boss_active && zc == 2u) ? OVERGROW[engine_prng() % 3u] : ORN[engine_prng() % 3u]);
+                    vel_pct = (boss_active && zc == 2u) ? 85u : 65u;
                 }
             }
         }
@@ -999,11 +1007,22 @@ void engine_tick_ppqn(void)
             }
         }
 
-        /* Boss Counter-Attack 2-beat drum roll buildup -> beat-timed chord sting & lunge */
+        /* Boss Counter-Attack 3-beat drum roll buildup -> beat-timed chord sting & lunge */
         if (g_state.boss_buildup_steps > 0u) {
-            uint16_t bvel = (uint16_t)(16000u + (uint32_t)(8u - g_state.boss_buildup_steps) * 2000u);
-            dsp_perc_trigger(1u, bvel);
-            if ((step & 1u) == 0u) dsp_perc_trigger(0u, bvel);
+            if (g_state.boss_buildup_steps == 10u) {
+                engine_set_ticker("> BOSS CHARGING!");
+            }
+            uint16_t bvel = (uint16_t)(16000u + (uint32_t)(12u - g_state.boss_buildup_steps) * 1400u);
+            if (g_state.boss_buildup_steps > 8u) {
+                if ((step & 1u) == 0u) dsp_perc_trigger(0u, bvel);
+            } else {
+                dsp_perc_trigger(1u, bvel);
+                if ((step & 1u) == 0u) dsp_perc_trigger(0u, bvel);
+            }
+            if (g_state.boss_buildup_steps <= 4u) {
+                g_state.shake_timer = 2u;
+                g_state.shake_amp = 1u;
+            }
             g_state.boss_buildup_steps--;
             if (g_state.boss_buildup_steps == 0u) {
                 g_state.boss_curse_bars = 1u;
@@ -1017,7 +1036,7 @@ void engine_tick_ppqn(void)
                 dsp_perc_trigger(1u, 32767u);
                 static const char *const BOSS_ATK_MSG[9] = {
                     "> LICH: DOOM!", "> MIMIC: BRAWL!", "> TREANT: OVERGROW!",
-                    "> VAMPIRE: BLOOD MOON!", "> DJINN: SANDSTORM!", "> BEHOLDER: WARP!",
+                    "> VAMPIRE: BLOOD MOON!", "> ANUBIS: SANDSTORM!", "> BEHOLDER: WARP!",
                     "> WYRM: BLIZZARD!", "> SERAPH: JUDGMENT!", "> DEMON: METEOR!"
                 };
                 engine_set_ticker(BOSS_ATK_MSG[z->subgenre_id % 9u]);
@@ -1025,8 +1044,8 @@ void engine_tick_ppqn(void)
         }
     }
 
-    if (g_state.boss_buildup_steps > 0u && g_state.boss_buildup_steps <= 2u && t == 3u) {
-        dsp_perc_trigger(1u, 30000u); /* Rapid snare roll into Boss chord sting */
+    if (g_state.boss_buildup_steps > 0u && g_state.boss_buildup_steps <= 4u && t == 3u) {
+        dsp_perc_trigger(1u, 30000u); /* Rapid 32nd snare roll into Boss chord sting */
     }
 
     if (eff_haste && fire_haste) {

@@ -164,6 +164,7 @@ typedef struct {
     uint8_t           boss_atk_timer;
     uint8_t           boss_curse_bars;
     uint8_t           boss_buildup_steps;
+    uint8_t           boss_turn_cnt;
     NoteProjectile    note_fx[MAX_SEED_NOTES];
 } CastletuniaState;
 

@@ -65,7 +65,7 @@ static uint16_t boss_atk_tint(uint8_t z)
         0xFC00u, /* 1 Tavern: amber ale */
         0x07E4u, /* 2 Glade: emerald overgrow */
         0xF800u, /* 3 Castle: crimson blood moon */
-        0xFD20u, /* 4 Sands: golden sandstorm */
+        0xFD20u, /* 4 Sands (Anubis): golden sandstorm */
         0x07FFu, /* 5 Spire: cyan void warp */
         0x867Fu, /* 6 Tundra: ice frost */
         0xFFE0u, /* 7 Coronation: radiant gold */
