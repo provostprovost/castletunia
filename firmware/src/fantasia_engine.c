@@ -382,11 +382,14 @@ void seed_commit_capture(void)
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
     g_state.attack_timer[s] = 15u;
+    uint8_t was_paused = !g_state.playing;
     g_state.playing = 1u;
-    /* Align step_16th so the entered melody starts immediately on beat 1 */
-    static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 3u, 6u};
-    g_state.tick_in_16th = 0u;
-    g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
+    if (was_paused) {
+        /* Starting from pause: align step_16th so the entered melody starts immediately on beat 1 */
+        static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 3u, 6u};
+        g_state.tick_in_16th = 0u;
+        g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
+    }
     /* Launch exact number of flying music notes at Boss (no chime SFX) */
     uint8_t mir = g_state.spells.mirror_active;
     for (uint8_t i = 0; i < count && i < MAX_SEED_NOTES; i++) {
@@ -883,8 +886,16 @@ void engine_tick_ppqn(void)
             if (denom > 0u) {
                 g_state.silence_ms += (60000u / denom);
             }
-            if (g_state.silence_ticks >= 28u && g_state.silence_ms >= 850u) {
-                seed_commit_capture();
+            if (!g_state.playing) {
+                if (g_state.silence_ticks >= 28u && g_state.silence_ms >= 850u) {
+                    seed_commit_capture();
+                }
+            } else {
+                /* Wait for the next quarter-note beat so character transitions stay locked to the groove */
+                if (g_state.silence_ticks >= 24u && g_state.silence_ms >= 750u &&
+                    g_state.tick_in_16th == 0u && (g_state.step_16th & 3u) == 0u) {
+                    seed_commit_capture();
+                }
             }
         }
     }
@@ -912,17 +923,16 @@ void engine_tick_ppqn(void)
                         (g_state.boss_curse_bars > 0u && ((g_state.settings.zone_id % 9u) == 5u || (g_state.settings.zone_id % 9u) == 8u));
 
     uint8_t fire_main = 0u;
-    uint8_t fire_haste = 0u;
+    uint8_t pair_tick = (uint8_t)((step & 1u) * 6u + t);
+    uint8_t fire_haste = (pair_tick == 0u || pair_tick == 4u || pair_tick == 8u); /* 1.5x tempo */
     if (swing_ticks == 0u) {
         fire_main = (t == 0u);
-        fire_haste = (t == 0u || t == 3u);
     } else {
         if ((step & 1u) == 0u) {
             fire_main = (t == 0u);
         } else {
             fire_main = (t == swing_ticks);
         }
-        fire_haste = (t == 0u || t == 3u);
     }
 
     if (fire_main) {
@@ -995,7 +1005,7 @@ void engine_tick_ppqn(void)
     }
 
     if (eff_haste && fire_haste) {
-        uint8_t hstep = (uint8_t)((step * 2u + (t >= 3u ? 1u : 0u)) & 15u);
+        uint8_t hstep = (uint8_t)(((step >> 1) * 3u + (pair_tick >> 2)) & 15u);
         trigger_slot_step(1u, hstep);
         trigger_slot_step(2u, hstep);
     }
