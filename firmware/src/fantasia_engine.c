@@ -359,7 +359,7 @@ void seed_commit_capture(void)
         }
         /* Nudge to next free 16th step so no played note is ever dropped */
         for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
-            step = (step + 2u) % 16u;
+            step = (step + ((tries < 8u) ? 2u : 1u)) % 16u;
         }
         used_steps |= (uint16_t)(1u << step);
         if (step > max_step) max_step = step;
@@ -443,7 +443,7 @@ void engine_on_key_down(uint8_t key_idx)
     uint8_t midi = engine_note_for_degree((int32_t)key_idx, target_slot);
     /* Ensure live key audition is above 196 Hz so it projects clearly on 28mm speaker */
     uint8_t aud_midi = (midi < 55u) ? (uint8_t)(midi + 12u) : midi;
-    dsp_note_on(target_slot, aud_midi, 32767u, 48u);
+    dsp_note_on(target_slot, aud_midi, 32767u, 72u);
 
     if (!g_state.capture.active) {
         g_state.capture.active = 1u;
@@ -662,6 +662,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 {
     SeedSlot *sl = &g_state.slots[s];
     if (sl->note_count == 0u) return;
+    /* Never steal/overwrite the voice of the Party member currently recording */
+    if ((g_state.capture.active || g_state.held_keys_mask != 0u) && s == g_state.next_slot) return;
 
     /* Stagger Party slots in call-and-response (Fighter=0, Cleric=+4, Sorceress=+8) */
     static const uint8_t SLOT_OFFSET[3] = {0u, 4u, 8u};
@@ -837,7 +839,7 @@ void engine_tick_ppqn(void)
             if (denom > 0u) {
                 g_state.silence_ms += (60000u / denom);
             }
-            if (g_state.silence_ticks >= 72u && g_state.silence_ms >= 2200u) {
+            if (g_state.silence_ticks >= 120u && g_state.silence_ms >= 3800u) {
                 seed_commit_capture();
             }
         }

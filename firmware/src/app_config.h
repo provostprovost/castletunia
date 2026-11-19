@@ -3,7 +3,7 @@
 #define APP_CONFIG_H
 
 #define AUDIO_SAMPLE_RATE 44100u
-#define MAX_SEED_NOTES    8u
+#define MAX_SEED_NOTES    16u
 #define NUM_PARTY_SLOTS   3u
 #define NUM_ZONES         9u
 #define SETTINGS_MAGIC    0xFAu

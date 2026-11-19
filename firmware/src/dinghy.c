@@ -71,9 +71,7 @@ static void app_main(void)
     engine_init_defaults();
     if (hal_settings_load(&g_state.settings, sizeof(FantasiaSaveBlob)) == 0 &&
         g_state.settings.magic == SETTINGS_MAGIC) {
-        for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
-            g_state.slots[s] = g_state.settings.saved_slots[s];
-        }
+        /* Restore zone/BPM/knobs cleanly; keep Party slots empty on boot until user plays */
         const ZoneDef *z = zone_get(g_state.settings.zone_id);
         uint8_t r = engine_drone_root_midi();
         dsp_drone_set(r,
