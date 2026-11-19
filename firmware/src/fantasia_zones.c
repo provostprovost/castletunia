@@ -13,8 +13,8 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 96,
         .reverb_fb = 26800,
         .party_patches = {
-            {2, 1, 28000, 14000, 140, 32660, 25000, 31900}, /* Crypt Fighter: loud dark pipe organ */
-            {4, 1, 18000,     0, 100, 32550,  8000, 32350}, /* Crypt Cleric: cathedral bell */
+            {2, 1, 18000,  6000, 160, 32660, 22000, 31900}, /* Crypt Fighter: warm dark organ */
+            {4, 1, 14000,     0, 100, 32550,  8000, 32350}, /* Crypt Cleric: soft cathedral bell */
             {1, 2,  9000,  1500, 900, 32680, 14000, 32300}  /* Crypt Sorceress: softer sub-octave haunt */
         },
         .perc_low  = { 800,  200, 32000,  2000, 1,  8000, 32758},

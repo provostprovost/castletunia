@@ -375,8 +375,11 @@ static void render_party_row(uint8_t s, int row_y)
     if (g_state.slots[s].frozen) {
         badge[0]='F'; badge[1]='R'; badge[2]='Z'; badge[3]='\0';
         bcol = 0x5E7Fu;
+    } else if (g_state.spells.haste_active && s >= 1u) {
+        badge[0]='H'; badge[1]='S'; badge[2]='T'; badge[3]='\0';
+        bcol = 0xFE60u;
     } else if (g_state.slots[s].note_count > 0u) {
-        badge[0]='A'; badge[1]='C'; badge[2]='T'; badge[3]='\0';
+        badge[0]='\0';
         bcol = 0x87F0u;
     } else {
         badge[0]='R'; badge[1]='D'; badge[2]='Y'; badge[3]='\0';
@@ -428,14 +431,6 @@ void ui_init(void)
     g_state.dirty_ticker = 1u;
 }
 
-static uint8_t any_note_fx_active(void)
-{
-    for (uint8_t i = 0; i < MAX_SEED_NOTES; i++) {
-        if (g_state.note_fx[i].active) return 1u;
-    }
-    return 0u;
-}
-
 static void render_note_projectiles(void)
 {
     static const uint8_t NOTE_GLYPH[7] = {
@@ -458,6 +453,30 @@ static void render_note_projectiles(void)
             np->delay--;
             continue;
         }
+        int ox = (int)np->x;
+        int oy = (int)np->y;
+        /* Erase previous 7x7 note footprint cleanly without wiping the whole diorama */
+        for (int r = 0; r < 7; r++) {
+            int yy = oy + r;
+            for (int c = 0; c < 7; c++) {
+                int xx = ox + c;
+                g_sprite_buf[r * 7 + c] = (xx >= 0 && xx < 240 && yy >= 0 && yy < 160)
+                    ? apply_boss_atk_fx(sample_diorama_px(z, xx >> 1, yy >> 1, mirror), z)
+                    : 0u;
+            }
+        }
+        if (ox >= 0 && ox <= 233 && oy >= 0 && oy <= 153) {
+            hal_lcd_blit_rect(ox, oy, 7, 7, g_sprite_buf);
+        }
+
+        np->x += np->vx;
+        np->y += np->vy;
+        if ((np->vx < 0 && np->x <= 72) || (np->vx > 0 && np->x >= 164)) {
+            np->active = 0u;
+            g_state.boss_hit_timer = 5u;
+            continue;
+        }
+
         int px = (int)np->x;
         int py = (int)np->y;
         uint16_t col = SLOT_COLS[np->slot % 3u];
@@ -475,12 +494,6 @@ static void render_note_projectiles(void)
         if (px >= 0 && px <= 233 && py >= 0 && py <= 153) {
             hal_lcd_blit_rect(px, py, 7, 7, g_sprite_buf);
         }
-        np->x += np->vx;
-        np->y += np->vy;
-        if ((np->vx < 0 && np->x <= 72) || (np->vx > 0 && np->x >= 164)) {
-            np->active = 0u;
-            g_state.boss_hit_timer = 5u;
-        }
     }
 }
 
@@ -495,16 +508,14 @@ void ui_render(void)
         g_state.dirty_ticker = 1u;
     }
 
-    uint8_t nfx = any_note_fx_active();
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u ||
-        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u || nfx) {
+        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u) {
         render_diorama_full();
         if (g_state.slide_frames == 0u) {
             render_battle_sprites();
-            if (nfx) render_note_projectiles();
+            render_note_projectiles();
         }
         g_state.dirty_diorama = 0u;
-        if (nfx && !any_note_fx_active()) g_state.dirty_diorama = 1u;
         if (g_state.slide_frames > 0u) {
             g_state.slide_frames--;
             if (g_state.slide_frames == 0u) g_state.dirty_diorama = 1u;
@@ -519,6 +530,7 @@ void ui_render(void)
         render_particles();
         g_boss_phase++;
         render_battle_sprites();
+        render_note_projectiles();
     }
 
     if (g_state.boss_hit_timer > 0u) g_state.boss_hit_timer--;

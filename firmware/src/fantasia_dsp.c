@@ -134,7 +134,7 @@ void dsp_drone_set(uint8_t root_midi, uint8_t third_midi, uint8_t fifth_midi, ui
     g_drone_inc3 = t_inc - (t_inc / 800u); /* -0.12% lush chorus 3rd */
     g_drone_third_en = third_en;
     g_drone_fifth_en = fifth_en;
-    g_drone_level_q15 = (int32_t)level * 168; /* Present, warm backing chord bed */
+    g_drone_level_q15 = (int32_t)level * 220; /* Prominent, warm backing chord bed */
 }
 
 static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -394,7 +394,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 2)) >> 1;
     int32_t d2 = g_drone_fifth_en ? (hal_sine_q15(g_drone_ph2) >> 1) : 0;
     int32_t d3 = g_drone_third_en ? (hal_sine_q15(g_drone_ph3) >> 1) : 0;
-    int32_t chord_sum = (d1 + d2 + d3) >> 1;
+    int32_t chord_sum = d1 + d2 + d3;
     int32_t drone_raw = q15_mul(chord_sum, lfo_gain);
     g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5000 + (int32_t)g_state.settings.harmony * 30);
     int32_t drone = g_state.playing ? q15_mul(g_drone_lpf, g_drone_level_q15) : 0;
@@ -422,10 +422,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix with clean headroom (>> 1); Fighter & Cleric balanced, backing chords raised */
-    int32_t p_mix = (pl >> 1) + (ph >> 2);
+    /* Stereo mix: Prominent backing chords & drums, balanced Party leads */
+    int32_t p_mix = pl + (ph >> 1);
     int32_t bg_mix = drone + p_mix;
-    int32_t pv[3] = { (v0 * 7) >> 3, (v1 * 7) >> 3, (v2 * 5) >> 3 };
+    int32_t pv[3] = { v0 >> 1, v1 >> 1, (v2 * 3) >> 3 };
     if (g_state.capture.active || g_state.held_keys_mask != 0u) {
         bg_mix >>= 2;
         uint8_t act = g_state.next_slot % 3u;

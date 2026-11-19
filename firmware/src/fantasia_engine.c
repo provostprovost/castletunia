@@ -970,8 +970,8 @@ void engine_tick_ppqn(void)
         if (inten >= 15u && g_state.settings.mix_perc > 0u) {
             uint16_t low_mask = 0u, high_mask = 0u;
             if (inten <= 45u) {
-                low_mask = (dens >= 40u) ? z->low_mask_march : (z->low_mask_march & 0x0101u);
-                if (dens >= 55u) high_mask = z->high_mask_march & 0x1010u;
+                low_mask = (dens >= 30u) ? z->low_mask_march : (z->low_mask_march & 0x0101u);
+                if (dens >= 40u) high_mask = z->high_mask_march;
             } else if (inten <= 75u) {
                 low_mask = z->low_mask_march;
                 high_mask = z->high_mask_march;
