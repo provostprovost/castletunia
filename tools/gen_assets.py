@@ -547,6 +547,47 @@ def make_sprite_palette():
     ]
 
 
+def load_or_gen_party_sprites(sp_pal):
+    from collections import deque
+    out = {}
+    for name in ("fighter", "wmage", "sorceress"):
+        p = ASSETS / "sprites" / f"{name}.png"
+        if p.exists():
+            im = Image.open(p).convert("RGB").resize((32, 32), Image.NEAREST)
+            px = im.load()
+            # Flood-fill black/near-black background from edges as transparent (0)
+            vis = [[False] * 32 for _ in range(32)]
+            q = deque([(x, 0) for x in range(32)] + [(x, 31) for x in range(32)] +
+                      [(0, y) for y in range(32)] + [(31, y) for y in range(32)])
+            bg = [[False] * 32 for _ in range(32)]
+            while q:
+                x, y = q.popleft()
+                if x < 0 or x >= 32 or y < 0 or y >= 32 or vis[y][x]:
+                    continue
+                r, g, b = px[x, y]
+                if r < 24 and g < 24 and b < 24:
+                    vis[y][x] = True
+                    bg[y][x] = True
+                    q.extend([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)])
+            grid = [[0] * 32 for _ in range(32)]
+            for y in range(32):
+                for x in range(32):
+                    if bg[y][x]:
+                        grid[y][x] = 0
+                        continue
+                    r, g, b = px[x, y]
+                    best_i, best_d = 1, 10**9
+                    for idx in range(1, 16):
+                        pr, pg, pb = sp_pal[idx]
+                        d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
+                        if d < best_d:
+                            best_d = d
+                            best_i = idx
+                    grid[y][x] = best_i
+            out[name] = grid
+    return out
+
+
 def gen_party_sprites():
     fighter = [
         "0000011111100000",
@@ -658,7 +699,8 @@ def main():
                 px[x * 2 + 1, y * 2 + 1] = c
         im.save(PREVIEWS / f"zone_{z}.png")
 
-    sp_pal_565 = [rgb_to_565(*c) for c in make_sprite_palette()]
+    sp_pal = make_sprite_palette()
+    sp_pal_565 = [rgb_to_565(*c) for c in sp_pal]
     freeze_pal_565 = [
         rgb_to_565(0, 0, 0), rgb_to_565(12, 28, 60), rgb_to_565(180, 232, 255),
         rgb_to_565(128, 198, 240), rgb_to_565(220, 248, 255), rgb_to_565(92, 160, 218),
@@ -668,6 +710,7 @@ def main():
         rgb_to_565(255, 255, 255),
     ]
     sprites = gen_party_sprites()
+    party_32 = load_or_gen_party_sprites(sp_pal)
 
     lines = [
         "/* SPDX-License-Identifier: GPL-3.0-only */",
@@ -682,7 +725,8 @@ def main():
         "    uint8_t  zone_maps[9][4800];",
         "    uint16_t sprite_pal[16];",
         "    uint16_t freeze_pal[16];",
-        "    uint8_t  sprites[4][128];",
+        "    uint8_t  party_sprites[3][512];",
+        "    uint8_t  cursor_sprite[128];",
         "} FantasiaAssets;",
         "",
         "static const FantasiaAssets fantasia_assets = {",
@@ -703,12 +747,14 @@ def main():
     lines.append("    },")
     lines.append("    .sprite_pal = { " + ", ".join(f"0x{c:04X}u" for c in sp_pal_565) + " },")
     lines.append("    .freeze_pal = { " + ", ".join(f"0x{c:04X}u" for c in freeze_pal_565) + " },")
-    lines.append("    .sprites = {")
-    for name in ("fighter", "wmage", "sorceress", "cursor"):
-        sdata = pack_nibbles(sprites[name])
+    lines.append("    .party_sprites = {")
+    for name in ("fighter", "wmage", "sorceress"):
+        sdata = pack_nibbles(party_32[name])
         chunk = ", ".join(f"0x{b:02X}u" for b in sdata)
         lines.append(f"        {{ {chunk} }},")
-    lines.append("    }")
+    lines.append("    },")
+    cdata = pack_nibbles(sprites["cursor"])
+    lines.append("    .cursor_sprite = { " + ", ".join(f"0x{b:02X}u" for b in cdata) + " }")
     lines.append("};")
     lines.append("")
     lines.append("#define G_FREEZE_PALETTE (fantasia_assets.freeze_pal)")

@@ -181,19 +181,15 @@ static void render_party_slot(uint8_t s, int base_x)
         }
     }
 
-    for (int sy = 0; sy < 16; sy++) {
-        for (int sx = 0; sx < 16; sx++) {
-            uint32_t idx = (uint32_t)sy * 16u + (uint32_t)sx;
-            uint8_t packed = fantasia_assets.sprites[s][idx >> 1];
+    for (int sy = 0; sy < 32; sy++) {
+        for (int sx = 0; sx < 32; sx++) {
+            uint32_t idx = (uint32_t)sy * 32u + (uint32_t)sx;
+            uint8_t packed = fantasia_assets.party_sprites[s][idx >> 1];
             uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
             if (ci == 0u) continue;
             uint16_t col = pal[ci];
-            int dy = 3 + hop + sy * 2;
-            int dx = sx * 2;
-            g_sprite_buf[dy * 32 + dx] = col;
-            g_sprite_buf[dy * 32 + dx + 1] = col;
-            g_sprite_buf[(dy + 1) * 32 + dx] = col;
-            g_sprite_buf[(dy + 1) * 32 + dx + 1] = col;
+            int dy = 3 + hop + sy;
+            g_sprite_buf[dy * 32 + sx] = col;
         }
     }
     hal_lcd_blit_rect(base_x, base_y - 3, 32, 36, g_sprite_buf);
@@ -206,7 +202,7 @@ static void render_party_slot(uint8_t s, int base_x)
             uint16_t col = bg;
             if (g_state.next_slot == s) {
                 uint32_t idx = (uint32_t)j * 16u + (uint32_t)i;
-                uint8_t packed = fantasia_assets.sprites[3][idx >> 1];
+                uint8_t packed = fantasia_assets.cursor_sprite[idx >> 1];
                 uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                 if (ci != 0u) col = fantasia_assets.sprite_pal[ci];
             }
