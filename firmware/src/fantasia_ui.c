@@ -18,9 +18,9 @@ typedef struct {
     int8_t  vy;
 } AmbientParticle;
 
-/* Small static scanline & sprite scratch (~3 KB total) */
+/* Small static scanline & sprite scratch (~4.3 KB total) */
 static uint16_t g_scanline[SCREEN_W];       /* 480 B */
-static uint16_t g_sprite_buf[32 * 36];      /* 2304 B */
+static uint16_t g_sprite_buf[42 * 45];      /* 3780 B */
 static uint16_t g_patch_buf[4 * 4];         /* 32 B */
 static AmbientParticle g_particles[NUM_PARTICLES];
 static uint8_t g_hud_frame_drawn = 0;
@@ -39,31 +39,30 @@ static void render_boss_overlay(void)
 {
     uint8_t z = g_state.settings.zone_id % 9u;
     uint8_t mirror = g_state.spells.mirror_active;
-    int bx = 88;
-    int by_base = 44;
+    int bx = 72; /* (240 - 96) / 2 */
+    int by_base = 30;
     int dy_bob = boss_hover_dy(g_boss_phase);
     int by = by_base + dy_bob;
 
-    /* Render 64x72 box (covers bob range -3..+3) in 8-row strips into g_sprite_buf (64*8 = 512 uint16_t) */
-    for (int strip = 0; strip < 72; strip += 8) {
-        for (int r = 0; r < 8; r++) {
+    /* Render 96x104 box (covers bob range -3..+3) in 4-row strips into g_sprite_buf (96*4 = 384 uint16_t) */
+    for (int strip = 0; strip < 104; strip += 4) {
+        for (int r = 0; r < 4; r++) {
             int sy_scr = (by_base - 4) + strip + r;
-            for (int c = 0; c < 64; c++) {
+            for (int c = 0; c < 96; c++) {
                 int sx_scr = bx + c;
                 uint16_t bg = sample_diorama_px(z, sx_scr >> 1, sy_scr >> 1, mirror);
                 int b_y = sy_scr - by;
-                if (b_y >= 0 && b_y < 64) {
-                    int b_sx = mirror ? (31 - (c >> 1)) : (c >> 1);
-                    int b_sy = b_y >> 1;
-                    uint32_t idx = (uint32_t)b_sy * 32u + (uint32_t)b_sx;
+                if (b_y >= 0 && b_y < 96) {
+                    int b_sx = mirror ? (95 - c) : c;
+                    uint32_t idx = (uint32_t)b_y * 96u + (uint32_t)b_sx;
                     uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
                     uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                     if (ci != 0u) bg = fantasia_assets.boss_pals[z][ci];
                 }
-                g_sprite_buf[r * 64 + c] = bg;
+                g_sprite_buf[r * 96 + c] = bg;
             }
         }
-        hal_lcd_blit_rect(bx, (by_base - 4) + strip, 64, 8, g_sprite_buf);
+        hal_lcd_blit_rect(bx, (by_base - 4) + strip, 96, 4, g_sprite_buf);
     }
 }
 
@@ -211,34 +210,34 @@ static void render_header(void)
 static void render_party_slot(uint8_t s, int base_x)
 {
     const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.party_pals[s];
-    int hop = (g_state.slots[s].anim_timer > 0u) ? -3 : 0;
-    int base_y = 182;
+    int hop = (g_state.slots[s].anim_timer > 0u) ? -2 : 0;
+    int base_y = 178;
 
-    /* 32x36 region (32x32 sprite + 4px hop clearance) */
-    for (int j = 0; j < 36; j++) {
-        uint16_t bg = hud_bg_color(base_y - 3 + j);
-        for (int i = 0; i < 32; i++) {
-            g_sprite_buf[j * 32 + i] = bg;
+    /* 42x44 region (42x42 sprite + 2px hop clearance) */
+    for (int j = 0; j < 44; j++) {
+        uint16_t bg = hud_bg_color(base_y - 2 + j);
+        for (int i = 0; i < 42; i++) {
+            g_sprite_buf[j * 42 + i] = bg;
         }
     }
 
-    for (int sy = 0; sy < 32; sy++) {
-        for (int sx = 0; sx < 32; sx++) {
-            uint32_t idx = (uint32_t)sy * 32u + (uint32_t)sx;
+    for (int sy = 0; sy < 42; sy++) {
+        for (int sx = 0; sx < 42; sx++) {
+            uint32_t idx = (uint32_t)sy * 42u + (uint32_t)sx;
             uint8_t packed = fantasia_assets.party_sprites[s][idx >> 1];
             uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
             if (ci == 0u) continue;
             uint16_t col = pal[ci];
-            int dy = 3 + hop + sy;
-            g_sprite_buf[dy * 32 + sx] = col;
+            int dy = 2 + hop + sy;
+            g_sprite_buf[dy * 42 + sx] = col;
         }
     }
-    hal_lcd_blit_rect(base_x, base_y - 3, 32, 36, g_sprite_buf);
+    hal_lcd_blit_rect(base_x, base_y - 2, 42, 44, g_sprite_buf);
 
-    /* Gloved pointer 16px left of next_slot */
-    int ptr_x = base_x - 16;
+    /* Gloved pointer 18px left of next_slot */
+    int ptr_x = base_x - 18;
     for (int j = 0; j < 16; j++) {
-        uint16_t bg = hud_bg_color(190 + j);
+        uint16_t bg = hud_bg_color(192 + j);
         for (int i = 0; i < 16; i++) {
             uint16_t col = bg;
             if (g_state.next_slot == s) {
@@ -250,9 +249,9 @@ static void render_party_slot(uint8_t s, int base_x)
             g_sprite_buf[j * 16 + i] = col;
         }
     }
-    hal_lcd_blit_rect(ptr_x, 190, 16, 16, g_sprite_buf);
+    hal_lcd_blit_rect(ptr_x, 192, 16, 16, g_sprite_buf);
 
-    /* 32x4 step activity bar at y=215..218 */
+    /* 42x3 step activity bar at y=220..222 */
     uint8_t len = (g_state.settings.weave > 60u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
     if (len == 0u) len = 16u;
     uint16_t active_mask = 0u;
@@ -261,19 +260,19 @@ static void render_party_slot(uint8_t s, int base_x)
             active_mask |= (uint16_t)(1u << (g_state.slots[s].step_pos[n] & 15u));
         }
     }
-    for (int j = 0; j < 4; j++) {
-        for (int i = 0; i < 32; i++) {
-            uint8_t step = (uint8_t)(i >> 1);
+    for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < 42; i++) {
+            uint8_t step = (uint8_t)((i * 16) / 42);
             uint16_t c = 0x1084u;
             if (step == g_state.slots[s].playhead && g_state.slots[s].note_count > 0u) {
                 c = 0xFFFFu;
             } else if (active_mask & (1u << step)) {
                 c = g_state.slots[s].frozen ? 0x5E7Fu : 0xFE60u;
             }
-            g_sprite_buf[j * 32 + i] = c;
+            g_sprite_buf[j * 42 + i] = c;
         }
     }
-    hal_lcd_blit_rect(base_x, 215, 32, 4, g_sprite_buf);
+    hal_lcd_blit_rect(base_x, 220, 42, 3, g_sprite_buf);
 }
 
 static void render_ticker(void)
@@ -331,7 +330,7 @@ void ui_render(void)
     }
 
     if (g_state.dirty_party) {
-        static const int SLOT_X[3] = {64, 112, 160};
+        static const int SLOT_X[3] = {28, 98, 168};
         for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
             render_party_slot(s, SLOT_X[s]);
             if (g_state.slots[s].anim_timer > 0u) g_state.slots[s].anim_timer--;

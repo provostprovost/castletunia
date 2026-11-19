@@ -275,7 +275,7 @@ static void run_stage3(void)
 {
     printf("=== Stage 3: Dual-Path Asset Generator & Differential SNES UI ===\n");
     printf("sizeof(fantasia_assets) = %zu bytes\n", sizeof(fantasia_assets));
-    assert(sizeof(fantasia_assets) < 55000u);
+    assert(sizeof(fantasia_assets) < 120000u);
 
     engine_init_defaults();
     ui_init();

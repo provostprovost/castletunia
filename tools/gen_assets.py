@@ -547,14 +547,14 @@ def make_sprite_palette():
     ]
 
 
-def quantize_rgba_32(path):
-    im = Image.open(path).convert("RGBA").resize((32, 32), Image.NEAREST)
+def quantize_rgba(path, size):
+    im = Image.open(path).convert("RGBA").resize((size, size), Image.NEAREST)
     px = im.load()
-    fg = Image.new("RGB", (32, 32), (16, 14, 24))
+    fg = Image.new("RGB", (size, size), (16, 14, 24))
     fg_px = fg.load()
-    mask = [[False] * 32 for _ in range(32)]
-    for y in range(32):
-        for x in range(32):
+    mask = [[False] * size for _ in range(size)]
+    for y in range(size):
+        for x in range(size):
             r, g, b, a = px[x, y]
             if a >= 96:
                 mask[y][x] = True
@@ -563,18 +563,18 @@ def quantize_rgba_32(path):
     raw_pal = q_im.getpalette()[:45]
     pal = [(0, 0, 0)] + [(raw_pal[i * 3], raw_pal[i * 3 + 1], raw_pal[i * 3 + 2]) for i in range(15)]
     q_px = list(q_im.getdata())
-    grid = [[0 if not mask[y][x] else (q_px[y * 32 + x] + 1) for x in range(32)] for y in range(32)]
+    grid = [[0 if not mask[y][x] else (q_px[y * size + x] + 1) for x in range(size)] for y in range(size)]
     return grid, [rgb_to_565(*c) for c in pal]
 
 
 def load_boss_sprite(zone_id):
-    return quantize_rgba_32(ASSETS / "bosses" / f"boss_{zone_id}.png")
+    return quantize_rgba(ASSETS / "bosses" / f"boss_{zone_id}.png", 96)
 
 
 def load_party_sprites():
     grids, pals = {}, {}
     for name in ("fighter", "wmage", "sorceress"):
-        g, p = quantize_rgba_32(ASSETS / "sprites" / f"{name}.png")
+        g, p = quantize_rgba(ASSETS / "sprites" / f"{name}.png", 42)
         grids[name] = g
         pals[name] = p
     return grids, pals
@@ -723,10 +723,10 @@ def main():
         "    uint16_t sprite_pal[16];",
         "    uint16_t freeze_pal[16];",
         "    uint16_t party_pals[3][16];",
-        "    uint8_t  party_sprites[3][512];",
+        "    uint8_t  party_sprites[3][882];",
         "    uint8_t  cursor_sprite[128];",
         "    uint16_t boss_pals[9][16];",
-        "    uint8_t  boss_sprites[9][512];",
+        "    uint8_t  boss_sprites[9][4608];",
         "} FantasiaAssets;",
         "",
         "static const FantasiaAssets fantasia_assets = {",
