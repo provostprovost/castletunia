@@ -419,12 +419,9 @@ static void render_ticker(void)
 void ui_render_splash(void)
 {
     for (int y = 0; y < 240; y++) {
-        int sy = y >> 1;
+        uint32_t row_off = (uint32_t)y * 240u;
         for (int x = 0; x < 240; x++) {
-            int sx = x >> 1;
-            uint32_t idx = (uint32_t)sy * 120u + (uint32_t)sx;
-            uint8_t packed = fantasia_assets.splash_data[idx >> 1];
-            uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
+            uint8_t ci = fantasia_assets.splash_data[row_off + (uint32_t)x];
             g_scanline[x] = fantasia_assets.splash_pal[ci];
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);

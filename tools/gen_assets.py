@@ -700,20 +700,17 @@ def load_splash():
     from PIL import Image
     src = ROOT / "assets" / "splash.jpg"
     im = Image.open(src).convert("RGB")
-    sm = im.resize((120, 120), Image.NEAREST)
-    q = sm.quantize(colors=16, method=Image.MEDIANCUT, dither=0)
-    raw_pal = q.getpalette()[: 16 * 3]
+    sm = im.resize((240, 240), Image.LANCZOS)
+    q = sm.quantize(colors=256, method=Image.MEDIANCUT, dither=1)
+    raw_pal = q.getpalette()[: 256 * 3]
     pal565 = []
-    for i in range(16):
+    for i in range(256):
         r, g, b = raw_pal[i * 3 : i * 3 + 3]
-        if r < 24 and g < 24 and b < 24:
-            r, g, b = 0, 0, 0
         pal565.append(rgb_to_565(r, g, b))
     px = list(q.getdata())
-    grid = [px[y * 120 : (y + 1) * 120] for y in range(120)]
     PREVIEWS.mkdir(parents=True, exist_ok=True)
-    q.convert("RGB").resize((240, 240), Image.NEAREST).save(PREVIEWS / "splash_preview.png")
-    return pal565, pack_nibbles(grid)
+    q.convert("RGB").save(PREVIEWS / "splash_preview.png")
+    return pal565, px
 
 
 def main():
@@ -777,8 +774,8 @@ def main():
         "    uint8_t  cursor_sprite[128];",
         "    uint16_t boss_pals[9][16];",
         "    uint8_t  boss_sprites[9][4608];",
-        "    uint16_t splash_pal[16];",
-        "    uint8_t  splash_data[7200];",
+        "    uint16_t splash_pal[256];",
+        "    uint8_t  splash_data[57600];",
         "} FantasiaAssets;",
         "",
         "static const FantasiaAssets fantasia_assets = {",
