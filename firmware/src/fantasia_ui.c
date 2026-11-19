@@ -320,8 +320,8 @@ static void render_party_row(uint8_t s, int row_y)
         badge[0]='F'; badge[1]='R'; badge[2]='Z'; badge[3]='\0';
         bcol = 0x5E7Fu;
     } else if (g_state.slots[s].note_count > 0u) {
-        uint8_t len = (g_state.settings.weave > 40u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
-        badge[0] = (g_state.settings.weave > 40u) ? 'W' : 'L';
+        uint8_t len = (g_state.settings.weave > 65u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
+        badge[0] = (g_state.settings.weave > 65u) ? 'W' : 'L';
         if (len >= 10u) {
             badge[1] = (char)('0' + (len / 10u));
             badge[2] = (char)('0' + (len % 10u));

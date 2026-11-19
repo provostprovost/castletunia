@@ -160,13 +160,13 @@ static void run_stage1(void)
     engine_adjust_macro(ENC_ALGORITHM, 5, 0);
     assert(g_state.settings.intensity == 60);
     engine_adjust_macro(ENC_KNOB1, 5, 0);
-    assert(g_state.settings.drift == 52);
+    assert(g_state.settings.drift == 56);
     engine_adjust_macro(ENC_KNOB2, 5, 0);
     assert(g_state.settings.density == 72);
     engine_adjust_macro(ENC_KNOB3, 5, 0);
-    assert(g_state.settings.harmony == 72);
+    assert(g_state.settings.harmony == 76);
     engine_adjust_macro(ENC_KNOB4, 5, 0);
-    assert(g_state.settings.weave == 65);
+    assert(g_state.settings.weave == 44);
 
     printf("Stage 1 PASSED!\n");
 }
@@ -318,24 +318,13 @@ static void run_stage4(void)
     input_process();
     assert(g_state.toll_ring_timer > 0);
 
-    /* 3. BTN_HOME tap CONJURE vs 600ms hold advance next_slot */
+    /* 3. BTN_HOME instant CONJURE on press */
     uint8_t prev_slot = g_state.next_slot;
     mock_btn_press = (1u << BTN_HOME);
     mock_ms = 100;
     input_process();
     mock_btn_rel = (1u << BTN_HOME);
     mock_ms = 200;
-    input_process();
-    assert(g_state.next_slot != prev_slot);
-
-    /* Hold 600ms */
-    prev_slot = g_state.next_slot;
-    mock_btn_press = (1u << BTN_HOME);
-    mock_ms = 300;
-    input_process();
-    mock_ms = 950;
-    input_process();
-    mock_btn_rel = (1u << BTN_HOME);
     input_process();
     assert(g_state.next_slot != prev_slot);
 

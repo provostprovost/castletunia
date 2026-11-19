@@ -89,8 +89,14 @@ static void format_pct_ticker(const char *label, uint8_t val)
     char msg[32];
     int i = 0;
     msg[i++] = '>'; msg[i++] = ' ';
-    while (*label && i < 22) msg[i++] = *label++;
-    msg[i++] = ':'; msg[i++] = ' ';
+    while (*label && i < 10) msg[i++] = *label++;
+    msg[i++] = ' '; msg[i++] = '[';
+    uint8_t filled = (uint8_t)((val + 5u) / 10u);
+    if (filled > 10u) filled = 10u;
+    for (uint8_t b = 0; b < 10u; b++) {
+        msg[i++] = (b < filled) ? '=' : '.';
+    }
+    msg[i++] = ']'; msg[i++] = ' ';
     if (val >= 100u) msg[i++] = (char)('0' + (val / 100u));
     if (val >= 10u)  msg[i++] = (char)('0' + ((val / 10u) % 10u));
     msg[i++] = (char)('0' + (val % 10u));
@@ -120,10 +126,10 @@ void engine_init_defaults(void)
     g_state.settings.root_semitone = 2u; /* D */
     g_state.settings.bpm = G_ZONES[0].default_bpm;
     g_state.settings.intensity = 40u;
-    g_state.settings.drift = 32u;
+    g_state.settings.drift = 36u;
     g_state.settings.density = 52u;
-    g_state.settings.harmony = 52u;
-    g_state.settings.weave = 45u;
+    g_state.settings.harmony = 56u;
+    g_state.settings.weave = 24u;
     g_state.settings.mix_drone = 88u;
     g_state.settings.mix_slots[0] = 108u;
     g_state.settings.mix_slots[1] = 100u;
@@ -186,27 +192,68 @@ void engine_toggle_freeze(uint8_t slot)
 
 void engine_clear_slot(uint8_t slot)
 {
-    if (slot >= NUM_PARTY_SLOTS || g_state.slots[slot].frozen) return;
+    if (slot >= NUM_PARTY_SLOTS) return;
+    /* If target slot is already empty or frozen, find the most recently active unfrozen slot */
+    if (g_state.slots[slot].frozen || g_state.slots[slot].note_count == 0u) {
+        for (uint8_t i = 1u; i <= NUM_PARTY_SLOTS; i++) {
+            uint8_t prev = (uint8_t)((slot + NUM_PARTY_SLOTS - i) % NUM_PARTY_SLOTS);
+            if (!g_state.slots[prev].frozen && g_state.slots[prev].note_count > 0u) {
+                slot = prev;
+                break;
+            }
+        }
+    }
+    if (g_state.slots[slot].frozen) return;
+
     SeedSlot empty;
     for (uint32_t i = 0; i < sizeof(empty); i++) ((uint8_t *)&empty)[i] = 0;
     empty.base_length = 16u;
-    empty.weave_length = (slot == 0u) ? 5u : (slot == 1u ? 7u : 11u);
+    empty.weave_length = (slot == 0u) ? 7u : (slot == 1u ? 11u : 13u);
     empty.fade_gain_q8 = 255u;
     for (uint8_t n = 0; n < MAX_SEED_NOTES; n++) empty.scale_deg[n] = -1;
+    g_state.slots[slot] = empty;
     g_state.staging_slots[slot] = empty;
     g_state.slot_pending[slot] = 1u;
+    dsp_voice_quick_release(slot);
+    g_state.next_slot = slot;
     g_state.dirty_party = 1u;
-    engine_set_ticker("> SLOT CLEARED!");
+    static const char *const CLR_MSG[3] = {
+        "> CLEARED FIGHTER!", "> CLEARED CLERIC!", "> CLEARED SORCERESS!"
+    };
+    engine_set_ticker(CLR_MSG[slot]);
 }
 
 void engine_clear_all_unfrozen(void)
 {
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         if (!g_state.slots[s].frozen) {
-            engine_clear_slot(s);
+            SeedSlot empty;
+            for (uint32_t i = 0; i < sizeof(empty); i++) ((uint8_t *)&empty)[i] = 0;
+            empty.base_length = 16u;
+            empty.weave_length = (s == 0u) ? 7u : (s == 1u ? 11u : 13u);
+            empty.fade_gain_q8 = 255u;
+            for (uint8_t n = 0; n < MAX_SEED_NOTES; n++) empty.scale_deg[n] = -1;
+            g_state.slots[s] = empty;
+            g_state.staging_slots[s] = empty;
+            g_state.slot_pending[s] = 1u;
+            dsp_voice_quick_release(s);
         }
     }
+    g_state.next_slot = find_next_unfrozen_slot(0u);
+    g_state.dirty_party = 1u;
     engine_set_ticker("> CLEARED!");
+}
+
+static int32_t snap_to_chord_gravity(int32_t deg, int32_t chord_root)
+{
+    /* Pull scale degree 1 step closer to nearest triad tone (root, +2, +4) */
+    int32_t rel = (deg - chord_root) % 7;
+    if (rel < 0) rel += 7;
+    if (rel == 1) return deg - 1;      /* 2nd -> root */
+    if (rel == 3) return deg - 1;      /* 4th -> 3rd */
+    if (rel == 5) return deg - 1;      /* 6th -> 5th */
+    if (rel == 6) return deg + 1;      /* 7th -> octave root */
+    return deg;
 }
 
 static void apply_drift_to_slot(SeedSlot *sl, uint8_t drift)
@@ -215,25 +262,47 @@ static void apply_drift_to_slot(SeedSlot *sl, uint8_t drift)
     uint32_t r = engine_prng();
     uint8_t idx = (uint8_t)(r % sl->note_count);
     int32_t deg = sl->scale_deg[idx];
-    if (deg < 0) deg = 0;
+    if (deg < 0) deg = (int32_t)(g_state.active_chord_deg % 7u);
 
-    if (drift <= 35u) {
-        if (r & 0x100u) {
-            deg = (deg >= 7) ? (deg - 7) : (deg + 7);
-        } else if (sl->note_count > 1u) {
-            deg = -1; /* Ghost rest */
+    /* 1. Self-Organizing Rhythmic & Harmonic Gravity (pulls phrase toward musical grid & chord) */
+    uint8_t st = sl->step_pos[idx];
+    if ((st & 1u) != 0u && (r & 3u) != 0u) {
+        /* Pull odd 16th steps onto clean 8th-note grid if unoccupied */
+        uint8_t target_st = (uint8_t)((st + 1u) & 14u);
+        uint8_t occ = 0u;
+        for (uint8_t k = 0; k < sl->note_count; k++) {
+            if (k != idx && sl->step_pos[k] == target_st) occ = 1u;
         }
-    } else if (drift <= 70u) {
-        int32_t delta = ((r >> 8) & 1u) ? 1 : -1;
-        if ((r >> 9) & 1u) delta *= 2;
-        deg += delta;
-        if (deg < 0) deg = 0;
-        if (deg > 26) deg = 26;
-    } else {
-        deg = (int32_t)((r >> 8) % 14u);
-        uint8_t step = (uint8_t)((sl->step_pos[idx] + (((r >> 12) & 1u) ? 1u : 15u)) % sl->base_length);
-        sl->step_pos[idx] = step;
+        if (!occ) sl->step_pos[idx] = target_st;
     }
+
+    int32_t c_root = (int32_t)(g_state.active_chord_deg % 7u);
+    deg = snap_to_chord_gravity(deg, c_root);
+
+    /* 2. Guided Musical Variation (prevents stale repetition while staying harmonic) */
+    static const int8_t HARMONIC_STEPS[4] = {0, 2, 4, 7};
+    if (drift <= 40u) {
+        /* Gentle chord-tone neighbor or octave breath */
+        if ((r & 3u) == 0u) {
+            deg += ((r & 4u) ? 2 : -2);
+        }
+    } else if (drift <= 75u) {
+        /* Arpeggio inversion or 3rd/5th harmony jump */
+        int32_t jump = HARMONIC_STEPS[(r >> 4) & 3u];
+        deg = c_root + ((deg >= 7) ? 7 : 0) + jump;
+    } else {
+        /* High evolution: counter-melody step + rhythmic syncopation on 8th grid */
+        deg = c_root + HARMONIC_STEPS[(r >> 4) & 3u] + (((r >> 8) & 1u) ? 7 : 0);
+        uint8_t cand = (uint8_t)(((sl->step_pos[idx] + 2u) % sl->base_length) & 14u);
+        uint8_t occ = 0u;
+        for (uint8_t k = 0; k < sl->note_count; k++) {
+            if (k != idx && sl->step_pos[k] == cand) occ = 1u;
+        }
+        if (!occ) sl->step_pos[idx] = cand;
+    }
+
+    if (deg < 0) deg = 0;
+    if (deg > 21) deg = 14 + (deg % 7);
     sl->scale_deg[idx] = (int8_t)deg;
 }
 
@@ -567,7 +636,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 
     /* Stagger Party slots in call-and-response (Fighter=0, Cleric=+4, Sorceress=+8) */
     static const uint8_t SLOT_OFFSET[3] = {0u, 4u, 8u};
-    uint8_t len = (g_state.settings.weave > 40u) ? sl->weave_length : sl->base_length;
+    uint8_t len = (g_state.settings.weave > 65u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
     uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
 
@@ -637,23 +706,40 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 
     if (deg < 0) return;
 
-    /* 4-Bar A/B/A/C Phrase Evolution */
+    /* Guided Band Accompaniment & 4-Bar RPG Evolution (A / B / A / C) */
     uint8_t form_bar = g_state.bar_count & 3u;
-    if (form_bar == 1u && (step & 3u) == 2u) {
-        deg += 2; /* Melodic answer */
-    } else if (form_bar == 3u && step >= 12u) {
-        deg += 4; /* Turnaround cadence lift */
-    }
+    int32_t c_root = (int32_t)g_state.active_chord_deg;
 
-    /* Harmony chord-tone gravity / voice-leading */
-    if (s == 0u && g_state.settings.harmony >= 15u) {
-        deg = (deg % 7) + (int32_t)g_state.active_chord_deg;
-    } else if (s == 1u && g_state.settings.harmony > 45u) {
-        static const int8_t ARP[4] = {0, 2, 4, 6};
-        uint8_t max_i = (g_state.settings.harmony > 75u) ? 4u : 3u;
-        deg = (int32_t)g_state.active_chord_deg + ARP[pos % max_i];
-    } else if (s == 2u && g_state.settings.harmony > 65u && (pos & 1u)) {
-        deg += ((pos & 2u) ? 4 : 6); /* 5th/7th harmonic color */
+    if (s == 0u) {
+        /* Fighter (Bass): Anchors root on beat 1, guided root/5th/walking movement on beats 2..4 */
+        if (step == 0u) {
+            deg = c_root;
+        } else if (g_state.settings.harmony >= 15u) {
+            static const int8_t BASS_WALK[4] = {0, 4, 2, 6};
+            uint8_t w_idx = (uint8_t)(((step >> 2) + form_bar) & 3u);
+            deg = c_root + BASS_WALK[w_idx];
+        }
+    } else if (s == 1u) {
+        /* Cleric (Arpeggio): 4 rotating RPG arpeggio shapes across bars so it stays fresh */
+        static const int8_t ARP_SHAPES[4][4] = {
+            {0, 2, 4, 7}, /* Bar 0: Rising Prelude */
+            {7, 4, 2, 0}, /* Bar 1: Falling Cascade */
+            {0, 4, 2, 4}, /* Bar 2: Alberti Wave */
+            {0, 2, 4, 6}  /* Bar 3: Seventh Turnaround */
+        };
+        if (g_state.settings.harmony >= 25u) {
+            uint8_t shape = (uint8_t)((form_bar + (g_state.settings.drift > 50u ? (engine_prng() & 1u) : 0u)) & 3u);
+            deg = c_root + ARP_SHAPES[shape][(step >> 1) & 3u];
+        }
+    } else {
+        /* Sorceress (Lead): Plays motif on Bars 0 & 2 (Call), guided Answer on Bar 1, Cadence on Bar 3 */
+        if (form_bar == 1u) {
+            deg = snap_to_chord_gravity(deg + 2, c_root); /* Third harmony answer */
+        } else if (form_bar == 3u) {
+            deg = (step >= 12u) ? (c_root + 7) : snap_to_chord_gravity(deg + 4, c_root);
+        } else if (g_state.settings.harmony >= 40u) {
+            deg = snap_to_chord_gravity(deg, c_root);
+        }
     }
 
     if (g_state.spells.mirror_active) {

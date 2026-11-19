@@ -8,10 +8,6 @@ static uint32_t g_prev_notes = 0u;
 static uint8_t  g_glo_held = 0u;
 static uint8_t  g_glo_enc_moved = 0u;
 
-static uint8_t  g_home_down = 0u;
-static uint8_t  g_home_hold_fired = 0u;
-static uint32_t g_home_down_ms = 0u;
-
 static uint8_t  g_rec_down = 0u;
 static uint8_t  g_rec_hold_fired = 0u;
 static uint32_t g_rec_down_ms = 0u;
@@ -21,8 +17,6 @@ void input_init(void)
     g_prev_notes = 0u;
     g_glo_held = 0u;
     g_glo_enc_moved = 0u;
-    g_home_down = 0u;
-    g_home_hold_fired = 0u;
     g_rec_down = 0u;
     g_rec_hold_fired = 0u;
 }
@@ -133,22 +127,9 @@ void input_process(void)
         }
     }
 
-    /* BTN_HOME: Tap CONJURE vs Hold 600ms Advance next_slot */
+    /* BTN_HOME: Instant CONJURE auto-attack on press */
     if (press & (1u << BTN_HOME)) {
-        g_home_down = 1u;
-        g_home_hold_fired = 0u;
-        g_home_down_ms = now;
-    }
-    if (g_home_down && !g_home_hold_fired && (now - g_home_down_ms) >= BTN_HOLD_MS) {
-        g_home_hold_fired = 1u;
-        engine_advance_next_slot();
-        engine_set_ticker("> NEXT PARTY SLOT");
-    }
-    if (rel & (1u << BTN_HOME)) {
-        if (g_home_down && !g_home_hold_fired) {
-            engine_spell_conjure();
-        }
-        g_home_down = 0u;
+        engine_spell_conjure();
     }
 
     /* BTN_REC: Cancel capture, Tap clear next_slot, Hold 600ms clear all unfrozen */
