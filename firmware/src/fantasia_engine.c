@@ -351,15 +351,15 @@ void seed_commit_capture(void)
         uint32_t step;
         if (count == 1u) {
             step = 0u;
-        } else if (span > 0u && span < 48u) {
-            /* Spread quick phrases rhythmically across the 16-step bar instead of bunching at beat 1 */
-            step = (g_state.capture.rel_tick[i] * 12u) / span;
+        } else if (span > 0u && span < 24u) {
+            /* Spread rapid phrases across syncopated 16ths instead of bunching at beat 1 */
+            step = (g_state.capture.rel_tick[i] * 13u) / span;
         } else {
             step = ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
         }
-        /* Nudge to next free 16th step so no played note is ever dropped */
+        /* Nudge to next free 16th step with syncopated +3 stride */
         for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
-            step = (step + ((tries < 8u) ? 2u : 1u)) % 16u;
+            step = (step + ((tries < 8u) ? 3u : 1u)) % 16u;
         }
         used_steps |= (uint16_t)(1u << step);
         if (step > max_step) max_step = step;
@@ -665,8 +665,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     /* Never steal/overwrite the voice of the Party member currently recording */
     if ((g_state.capture.active || g_state.held_keys_mask != 0u) && s == g_state.next_slot) return;
 
-    /* Stagger Party slots in call-and-response (Fighter=0, Cleric=+4, Sorceress=+8) */
-    static const uint8_t SLOT_OFFSET[3] = {0u, 4u, 8u};
+    /* Stagger Party slots with syncopated call-and-response (Fighter=0, Cleric=+3, Sorceress=+6) */
+    static const uint8_t SLOT_OFFSET[3] = {0u, 3u, 6u};
     uint8_t len = (g_state.settings.weave > 65u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
     uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
@@ -709,11 +709,14 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             }
             if (pos == 0u) {
                 deg = base_deg;
-            } else if (pos == 8u && (other_occ || eff_density > 50u)) {
+            } else if (pos == 6u && (other_occ || eff_density > 45u)) {
                 deg = base_deg + 4;
-            } else if (pos == 12u && eff_density > 75u) {
+            } else if (pos == 11u && eff_density > 55u) {
                 deg = base_deg + 7;
-                vel_pct = 75u;
+                vel_pct = 78u;
+            } else if (pos == 14u && eff_density > 70u) {
+                deg = base_deg + 2;
+                vel_pct = 72u;
             }
         }
     } else {
@@ -854,8 +857,9 @@ void engine_tick_ppqn(void)
     uint8_t swing_ticks = 0u;
     uint8_t eff_weave = (g_state.boss_curse_bars > 0u && (g_state.settings.zone_id % 9u) == 1u)
                       ? 58u : g_state.settings.weave;
-    if (eff_weave >= 21u && eff_weave <= 60u) {
-        swing_ticks = (uint8_t)((eff_weave - 20u) / 13u);
+    if (eff_weave >= 15u && eff_weave <= 65u) {
+        swing_ticks = (uint8_t)(1u + (eff_weave - 15u) / 15u);
+        if (swing_ticks > 3u) swing_ticks = 3u;
     }
     uint8_t eff_haste = g_state.spells.haste_active ||
                         (g_state.boss_curse_bars > 0u && ((g_state.settings.zone_id % 9u) == 5u || (g_state.settings.zone_id % 9u) == 8u));
