@@ -464,6 +464,13 @@ void engine_on_key_up(uint8_t key_idx)
 {
     if (key_idx >= 27u) return;
     g_state.held_keys_mask &= ~(1u << key_idx);
+    if (g_state.held_keys_mask == 0u && g_state.capture.active) {
+        uint8_t target_slot = g_state.next_slot;
+        if (g_state.slots[target_slot].frozen) {
+            target_slot = find_next_unfrozen_slot(target_slot);
+        }
+        dsp_voice_quick_release(target_slot);
+    }
 }
 
 void engine_spell_haste_toggle(void)
@@ -846,7 +853,7 @@ void engine_tick_ppqn(void)
             if (denom > 0u) {
                 g_state.silence_ms += (60000u / denom);
             }
-            if (g_state.silence_ticks >= 120u && g_state.silence_ms >= 3800u) {
+            if (g_state.silence_ticks >= 54u && g_state.silence_ms >= 1500u) {
                 seed_commit_capture();
             }
         }
