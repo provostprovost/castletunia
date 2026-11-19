@@ -9,7 +9,7 @@
 #define DIORAMA_H 80
 #define SCREEN_W  240
 #define SCREEN_H  240
-#define NUM_PARTICLES 8
+#define NUM_PARTICLES 6
 
 typedef struct {
     int16_t x;
@@ -27,48 +27,8 @@ static uint8_t g_hud_frame_drawn = 0;
 static uint8_t g_last_haste = 0;
 static uint8_t g_boss_phase = 0;
 
-static uint16_t sample_diorama_px(uint8_t zone_id, int sx, int sy, uint8_t mirror);
-
-static int boss_hover_dy(uint8_t phase)
-{
-    static const int8_t BOB[16] = {-3, -3, -2, -1, 0, 1, 2, 3, 3, 3, 2, 1, 0, -1, -2, -3};
-    return (int)BOB[(phase >> 1) & 15u];
-}
-
-static void render_boss_overlay(void)
-{
-    uint8_t z = g_state.settings.zone_id % 9u;
-    uint8_t mirror = g_state.spells.mirror_active;
-    int bx = 72; /* (240 - 96) / 2 */
-    int by_base = 30;
-    int dy_bob = boss_hover_dy(g_boss_phase);
-    int by = by_base + dy_bob;
-
-    /* Render 96x104 box (covers bob range -3..+3) in 4-row strips into g_sprite_buf (96*4 = 384 uint16_t) */
-    for (int strip = 0; strip < 104; strip += 4) {
-        for (int r = 0; r < 4; r++) {
-            int sy_scr = (by_base - 4) + strip + r;
-            for (int c = 0; c < 96; c++) {
-                int sx_scr = bx + c;
-                uint16_t bg = sample_diorama_px(z, sx_scr >> 1, sy_scr >> 1, mirror);
-                int b_y = sy_scr - by;
-                if (b_y >= 0 && b_y < 96) {
-                    int b_sx = mirror ? (95 - c) : c;
-                    uint32_t idx = (uint32_t)b_y * 96u + (uint32_t)b_sx;
-                    uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
-                    uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
-                    if (ci != 0u) bg = fantasia_assets.boss_pals[z][ci];
-                }
-                g_sprite_buf[r * 96 + c] = bg;
-            }
-        }
-        hal_lcd_blit_rect(bx, (by_base - 4) + strip, 96, 4, g_sprite_buf);
-    }
-}
-
 static uint16_t hud_bg_color(int y)
 {
-    /* Royal-blue FFVI gradient for y=160..239 */
     int t = y - 160;
     if (t < 0) t = 0;
     if (t > 79) t = 79;
@@ -90,6 +50,94 @@ static uint16_t sample_diorama_px(uint8_t zone_id, int sx, int sy, uint8_t mirro
     uint8_t packed = fantasia_assets.zone_maps[zone_id % 9u][idx >> 1];
     uint8_t pal_idx = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
     return fantasia_assets.zone_pals[zone_id % 9u][pal_idx];
+}
+
+static int boss_hover_dy(uint8_t phase)
+{
+    static const int8_t BOB[16] = {-3, -3, -2, -1, 0, 1, 2, 3, 3, 3, 2, 1, 0, -1, -2, -3};
+    return (int)BOB[(phase >> 1) & 15u];
+}
+
+static void render_battle_sprites(void)
+{
+    uint8_t z = g_state.settings.zone_id % 9u;
+    uint8_t mirror = g_state.spells.mirror_active;
+
+    /* 1. Boss on left/center (x=16..111, y=34..129) */
+    int bx = 16;
+    if (g_state.boss_hit_timer > 0u) {
+        bx += (g_state.boss_hit_timer & 1u) ? -3 : 3;
+    }
+    int by_base = 34;
+    int by = by_base + boss_hover_dy(g_boss_phase);
+
+    for (int strip = 0; strip < 104; strip += 4) {
+        for (int r = 0; r < 4; r++) {
+            int sy_scr = (by_base - 4) + strip + r;
+            for (int c = 0; c < 96; c++) {
+                int sx_scr = 16 + c;
+                uint16_t bg = sample_diorama_px(z, sx_scr >> 1, sy_scr >> 1, mirror);
+                int b_x = sx_scr - bx;
+                int b_y = sy_scr - by;
+                if (b_x >= 0 && b_x < 96 && b_y >= 0 && b_y < 96) {
+                    int b_sx = mirror ? (95 - b_x) : b_x;
+                    uint32_t idx = (uint32_t)b_y * 96u + (uint32_t)b_sx;
+                    uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
+                    uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
+                    if (ci != 0u) {
+                        bg = (g_state.boss_hit_timer > 0u && (g_state.boss_hit_timer & 1u))
+                           ? 0xFFFFu : fantasia_assets.boss_pals[z][ci];
+                    }
+                }
+                /* Diagonal slash / spell flash on boss hit */
+                if (g_state.boss_hit_timer > 3u) {
+                    int slash_x = 24 + (10 - (int)g_state.boss_hit_timer) * 6;
+                    if (c >= slash_x && c <= slash_x + 3 && sy_scr >= 56 && sy_scr <= 104 &&
+                        ((c - slash_x) == ((sy_scr - 56) / 12) || (c - slash_x) == 0)) {
+                        bg = 0xFE60u;
+                    }
+                }
+                g_sprite_buf[r * 96 + c] = bg;
+            }
+        }
+        hal_lcd_blit_rect(16, (by_base - 4) + strip, 96, 4, g_sprite_buf);
+    }
+
+    /* 2. Staggered FFVI Party Column on right (ABOVE the blue menu bar) */
+    static const int BASE_X[3] = {174, 182, 190};
+    static const int BASE_Y[3] = {24, 68, 112};
+    for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
+        const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.party_pals[s];
+        int lunge = 0;
+        if (g_state.attack_timer[s] > 0u) {
+            int t = (int)g_state.attack_timer[s];
+            lunge = (t > 6) ? -(12 - t) * 5 : -t * 5; /* Lunge left toward boss & return */
+        }
+        int hop = (g_state.slots[s].anim_timer > 0u) ? -2 : 0;
+        int lane_x = BASE_X[s] - 32; /* 74px wide lane covers lunge */
+        int lane_y = BASE_Y[s] - 2;
+        int sx0 = BASE_X[s] + lunge;
+
+        for (int strip = 0; strip < 44; strip += 4) {
+            for (int r = 0; r < 4; r++) {
+                int sy_scr = lane_y + strip + r;
+                for (int c = 0; c < 74; c++) {
+                    int px_scr = lane_x + c;
+                    uint16_t bg = sample_diorama_px(z, px_scr >> 1, sy_scr >> 1, mirror);
+                    int sp_x = px_scr - sx0;
+                    int sp_y = sy_scr - (BASE_Y[s] + hop);
+                    if (sp_x >= 0 && sp_x < 42 && sp_y >= 0 && sp_y < 42) {
+                        uint32_t idx = (uint32_t)sp_y * 42u + (uint32_t)sp_x;
+                        uint8_t packed = fantasia_assets.party_sprites[s][idx >> 1];
+                        uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
+                        if (ci != 0u) bg = pal[ci];
+                    }
+                    g_sprite_buf[r * 74 + c] = bg;
+                }
+            }
+            hal_lcd_blit_rect(lane_x, lane_y + strip, 74, 4, g_sprite_buf);
+        }
+    }
 }
 
 static void restore_diorama_4x4(uint8_t zone_id, int px, int py, uint8_t mirror)
@@ -141,7 +189,6 @@ static void render_diorama_full(void)
             g_scanline[x] = c;
         }
 
-        /* Optional Toll shockwave ring */
         if (g_state.toll_ring_timer > 0u) {
             int rad = (15 - (int)g_state.toll_ring_timer) * 6;
             int dy = y - 80;
@@ -167,8 +214,8 @@ static void render_particles(void)
         restore_diorama_4x4(z, g_particles[i].x, g_particles[i].y, mirror);
         g_particles[i].x += g_particles[i].vx;
         g_particles[i].y += g_particles[i].vy;
-        if (g_particles[i].x < 4) g_particles[i].x = 232;
-        if (g_particles[i].x > 234) g_particles[i].x = 6;
+        if (g_particles[i].x < 4) g_particles[i].x = 136;
+        if (g_particles[i].x > 138) g_particles[i].x = 6;
         if (g_particles[i].y < 4) g_particles[i].y = 152;
         if (g_particles[i].y > 154) g_particles[i].y = 6;
         for (int j = 0; j < 4; j++) g_patch_buf[j] = pcol;
@@ -194,8 +241,20 @@ static void render_hud_border(void)
 
 static void render_header(void)
 {
+    static const char *const ROOT_NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+    static const char *const MODE_NAMES[9] = {"AEOL", "MIXO", "DOR", "HARM", "PHRY", "LYD", "AEOL", "ION", "PHRY"};
     const ZoneDef *z = zone_get(g_state.settings.zone_id);
-    char bpm_str[12];
+
+    char key_str[16];
+    const char *rn = ROOT_NAMES[g_state.settings.root_semitone % 12u];
+    const char *mn = MODE_NAMES[g_state.settings.zone_id % 9u];
+    int k = 0;
+    while (*rn) key_str[k++] = *rn++;
+    key_str[k++] = ' ';
+    while (*mn) key_str[k++] = *mn++;
+    key_str[k] = '\0';
+
+    char bpm_str[10];
     uint8_t b = g_state.settings.bpm;
     int i = 0;
     if (b >= 100u) bpm_str[i++] = (char)('0' + (b / 100u));
@@ -203,41 +262,17 @@ static void render_header(void)
     bpm_str[i++] = (char)('0' + (b % 10u));
     bpm_str[i++] = ' '; bpm_str[i++] = 'B'; bpm_str[i++] = 'P'; bpm_str[i++] = 'M'; bpm_str[i] = '\0';
 
-    hal_draw_text(8, 162, 140, z->name, 0xFFFFu, hud_bg_color(166), 0);
-    hal_draw_text(152, 162, 80, bpm_str, 0xFE60u, hud_bg_color(166), 2);
+    hal_draw_text(6, 162, 92, z->name, 0xFFFFu, hud_bg_color(166), 0);
+    hal_draw_text(100, 162, 74, key_str, 0x5E7Fu, hud_bg_color(166), 1);
+    hal_draw_text(176, 162, 58, bpm_str, 0xFE60u, hud_bg_color(166), 2);
 }
 
-static void render_party_slot(uint8_t s, int base_x)
+static void render_party_row(uint8_t s, int row_y)
 {
-    const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.party_pals[s];
-    int hop = (g_state.slots[s].anim_timer > 0u) ? -2 : 0;
-    int base_y = 178;
-
-    /* 42x44 region (42x42 sprite + 2px hop clearance) */
-    for (int j = 0; j < 44; j++) {
-        uint16_t bg = hud_bg_color(base_y - 2 + j);
-        for (int i = 0; i < 42; i++) {
-            g_sprite_buf[j * 42 + i] = bg;
-        }
-    }
-
-    for (int sy = 0; sy < 42; sy++) {
-        for (int sx = 0; sx < 42; sx++) {
-            uint32_t idx = (uint32_t)sy * 42u + (uint32_t)sx;
-            uint8_t packed = fantasia_assets.party_sprites[s][idx >> 1];
-            uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
-            if (ci == 0u) continue;
-            uint16_t col = pal[ci];
-            int dy = 2 + hop + sy;
-            g_sprite_buf[dy * 42 + sx] = col;
-        }
-    }
-    hal_lcd_blit_rect(base_x, base_y - 2, 42, 44, g_sprite_buf);
-
-    /* Gloved pointer 18px left of next_slot */
-    int ptr_x = base_x - 18;
-    for (int j = 0; j < 16; j++) {
-        uint16_t bg = hud_bg_color(192 + j);
+    static const char *const NAMES[3] = {"FIGHTER", "W.MAGE", "SORCERESS"};
+    /* Gloved pointer */
+    for (int j = 0; j < 14; j++) {
+        uint16_t bg = hud_bg_color(row_y + j);
         for (int i = 0; i < 16; i++) {
             uint16_t col = bg;
             if (g_state.next_slot == s) {
@@ -249,30 +284,35 @@ static void render_party_slot(uint8_t s, int base_x)
             g_sprite_buf[j * 16 + i] = col;
         }
     }
-    hal_lcd_blit_rect(ptr_x, 192, 16, 16, g_sprite_buf);
+    hal_lcd_blit_rect(6, row_y, 16, 14, g_sprite_buf);
 
-    /* 42x3 step activity bar at y=220..222 */
-    uint8_t len = (g_state.settings.weave > 60u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
-    if (len == 0u) len = 16u;
+    uint16_t name_col = g_state.slots[s].frozen ? 0x5E7Fu : (g_state.next_slot == s ? 0xFE60u : 0xFFFFu);
+    hal_draw_text(24, row_y, 82, NAMES[s], name_col, hud_bg_color(row_y), 0);
+
+    /* 64x6 step activity bar */
     uint16_t active_mask = 0u;
     for (uint8_t n = 0; n < g_state.slots[s].note_count; n++) {
         if (g_state.slots[s].scale_deg[n] >= 0) {
             active_mask |= (uint16_t)(1u << (g_state.slots[s].step_pos[n] & 15u));
         }
     }
-    for (int j = 0; j < 3; j++) {
-        for (int i = 0; i < 42; i++) {
-            uint8_t step = (uint8_t)((i * 16) / 42);
+    for (int j = 0; j < 6; j++) {
+        for (int i = 0; i < 64; i++) {
+            uint8_t step = (uint8_t)(i >> 2);
             uint16_t c = 0x1084u;
             if (step == g_state.slots[s].playhead && g_state.slots[s].note_count > 0u) {
                 c = 0xFFFFu;
             } else if (active_mask & (1u << step)) {
                 c = g_state.slots[s].frozen ? 0x5E7Fu : 0xFE60u;
             }
-            g_sprite_buf[j * 42 + i] = c;
+            g_sprite_buf[j * 64 + i] = c;
         }
     }
-    hal_lcd_blit_rect(base_x, 220, 42, 3, g_sprite_buf);
+    hal_lcd_blit_rect(112, row_y + 4, 64, 6, g_sprite_buf);
+
+    const char *badge = g_state.slots[s].frozen ? "FROZEN" : (g_state.slots[s].note_count > 0u ? "ACTIVE" : "READY");
+    uint16_t bcol = g_state.slots[s].frozen ? 0x5E7Fu : (g_state.slots[s].note_count > 0u ? 0x87F0u : 0xAD55u);
+    hal_draw_text(180, row_y, 54, badge, bcol, hud_bg_color(row_y), 2);
 }
 
 static void render_ticker(void)
@@ -283,8 +323,8 @@ static void render_ticker(void)
 void ui_init(void)
 {
     for (int i = 0; i < NUM_PARTICLES; i++) {
-        g_particles[i].x = (int16_t)(16 + i * 28);
-        g_particles[i].y = (int16_t)(20 + (i * 19) % 120);
+        g_particles[i].x = (int16_t)(12 + i * 20);
+        g_particles[i].y = (int16_t)(16 + (i * 23) % 120);
         g_particles[i].vx = (i & 1) ? 1 : -1;
         g_particles[i].vy = 1;
     }
@@ -308,7 +348,7 @@ void ui_render(void)
 
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u || g_state.toll_ring_timer > 0u) {
         render_diorama_full();
-        if (g_state.slide_frames == 0u) render_boss_overlay();
+        if (g_state.slide_frames == 0u) render_battle_sprites();
         g_state.dirty_diorama = 0u;
         if (g_state.slide_frames > 0u) g_state.slide_frames--;
         if (g_state.shake_timer > 0u) g_state.shake_timer--;
@@ -316,7 +356,13 @@ void ui_render(void)
     } else {
         render_particles();
         g_boss_phase++;
-        render_boss_overlay();
+        render_battle_sprites();
+    }
+
+    if (g_state.boss_hit_timer > 0u) g_state.boss_hit_timer--;
+    for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
+        if (g_state.attack_timer[s] > 0u) g_state.attack_timer[s]--;
+        if (g_state.slots[s].anim_timer > 0u) g_state.slots[s].anim_timer--;
     }
 
     if (g_state.gold_flash_timer > 0u) {
@@ -330,10 +376,9 @@ void ui_render(void)
     }
 
     if (g_state.dirty_party) {
-        static const int SLOT_X[3] = {28, 98, 168};
+        static const int ROW_Y[3] = {179, 193, 207};
         for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
-            render_party_slot(s, SLOT_X[s]);
-            if (g_state.slots[s].anim_timer > 0u) g_state.slots[s].anim_timer--;
+            render_party_row(s, ROW_Y[s]);
         }
         g_state.dirty_party = 0u;
     }

@@ -57,8 +57,8 @@ void engine_set_ticker(const char *msg)
 
 uint8_t engine_drone_root_midi(void)
 {
-    /* C2 (36) .. B2 (47) */
-    return (uint8_t)(36u + (g_state.settings.root_semitone % 12u));
+    /* C3 (48) .. B3 (59) so tonal center is unmistakable on 28mm speaker */
+    return (uint8_t)(48u + (g_state.settings.root_semitone % 12u));
 }
 
 uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
@@ -247,20 +247,27 @@ void seed_commit_capture(void)
     for (uint32_t i = 0; i < sizeof(ns); i++) ((uint8_t *)&ns)[i] = 0;
     for (uint8_t n = 0; n < MAX_SEED_NOTES; n++) ns.scale_deg[n] = -1;
 
-    uint32_t max_step = 0u;
     uint8_t count = g_state.capture.count;
     if (count > MAX_SEED_NOTES) count = MAX_SEED_NOTES;
 
+    uint16_t used_steps = 0u;
+    uint32_t max_step = 0u;
     for (uint8_t i = 0; i < count; i++) {
-        uint32_t step = (g_state.capture.rel_tick[i] + 3u) / 6u;
-        step %= 16u;
+        uint32_t step = (i == 0u && g_state.capture.rel_tick[0] < 6u)
+                      ? 0u
+                      : ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
+        /* Nudge to next free 16th step so no played note is ever dropped */
+        for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
+            step = (step + 1u) % 16u;
+        }
+        used_steps |= (uint16_t)(1u << step);
         if (step > max_step) max_step = step;
         ns.scale_deg[i] = (int8_t)g_state.capture.scale_deg[i];
         ns.step_pos[i] = (uint8_t)step;
     }
 
     ns.note_count = count;
-    ns.base_length = (max_step < 4u) ? 4u : (max_step < 8u ? 8u : 16u);
+    ns.base_length = (count <= 3u && max_step < 8u) ? 8u : 16u;
     static const uint8_t WEAVE_LENS[3][2] = { {5u, 7u}, {7u, 11u}, {11u, 13u} };
     ns.weave_length = WEAVE_LENS[s][engine_prng() & 1u];
     ns.playhead = 0u;
@@ -283,8 +290,14 @@ void seed_commit_capture(void)
     g_state.capture.count = 0u;
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
+    g_state.attack_timer[s] = 12u;
+    g_state.boss_hit_timer = 10u;
+    g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
-    engine_set_ticker("> SEED PLANTED!");
+    static const char *const ATK_MSG[3] = {
+        "> FIGHTER: SLASH!", "> W.MAGE: HOLY!", "> SORCERESS: FLARE!"
+    };
+    engine_set_ticker(ATK_MSG[s]);
 }
 
 void engine_on_key_down(uint8_t key_idx)
@@ -421,6 +434,9 @@ void engine_spell_conjure(void)
     g_state.staging_slots[s] = ns;
     g_state.slot_pending[s] = 1u;
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
+    g_state.attack_timer[s] = 12u;
+    g_state.boss_hit_timer = 10u;
+    g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
     engine_set_ticker("> CONJURED!");
 }
@@ -442,6 +458,7 @@ void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
                 int32_t r = ((int32_t)g_state.settings.root_semitone + delta) % 12;
                 if (r < 0) r += 12;
                 g_state.settings.root_semitone = (uint8_t)r;
+                g_state.dirty_header = 1u;
                 update_drone_pitch();
                 static const char *const NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
                 char msg[24] = "> ROOT: ";
@@ -592,13 +609,15 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 
     if (deg < 0) return;
 
-    /* Harmony chord-tone gravity / micro-arpeggiation */
-    if (s == 1u && g_state.settings.harmony > 50u) {
+    /* Harmony chord-tone gravity / voice-leading */
+    if (s == 0u && g_state.settings.harmony >= 26u) {
+        deg = (deg % 7) + (int32_t)g_state.active_chord_deg;
+    } else if (s == 1u && g_state.settings.harmony > 50u) {
         static const int8_t ARP[4] = {0, 2, 4, 6};
         uint8_t max_i = (g_state.settings.harmony > 75u) ? 4u : 3u;
         deg = (int32_t)g_state.active_chord_deg + ARP[pos % max_i];
     } else if (s == 2u && g_state.settings.harmony > 75u && (pos & 1u)) {
-        deg += ((pos & 2u) ? 6 : 8); /* 7th/9th upper color extensions */
+        deg += ((pos & 2u) ? 4 : 6); /* 5th/7th harmonic color */
     }
 
     if (g_state.spells.mirror_active) {
@@ -627,7 +646,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     vel_q15 = (vel_q15 * (uint32_t)sl->fade_gain_q8) >> 8;
     if (vel_q15 > 32767u) vel_q15 = 32767u;
 
-    uint16_t gate = (g_state.spells.haste_active && s >= 1u) ? 2u : 4u;
+    uint16_t gate = (g_state.spells.haste_active && s >= 1u) ? 4u : 8u;
     dsp_note_on(s, midi, (uint16_t)vel_q15, gate);
     sl->playhead = pos;
     sl->anim_timer = 8u;
@@ -725,7 +744,7 @@ void engine_tick_ppqn(void)
                     high_mask |= (uint16_t)(1u << step);
                 }
             }
-            uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 256u);
+            uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 160u);
             if (low_mask & (1u << step)) dsp_perc_trigger(0u, vel);
             if (high_mask & (1u << step)) dsp_perc_trigger(1u, vel);
             if (inten > 75u && (step & 3u) == 0u) {
