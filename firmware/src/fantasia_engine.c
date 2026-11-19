@@ -51,7 +51,7 @@ static uint8_t find_next_unfrozen_slot(uint8_t start)
 void engine_set_ticker(const char *msg)
 {
     copy_str(g_state.ticker, msg, sizeof(g_state.ticker));
-    g_state.ticker_timer = 36u;
+    g_state.ticker_timer = (g_state.settings.bpm < 90u) ? 2u : 3u; /* <= 2s, clears on beat */
     g_state.dirty_ticker = 1u;
 }
 
@@ -889,7 +889,13 @@ void engine_tick_ppqn(void)
         }
     }
 
-    if (!g_state.playing) return;
+    if (!g_state.playing) {
+        if ((g_state.total_ticks % 24u) == 0u && g_state.ticker_timer > 0u) {
+            g_state.ticker_timer--;
+            if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
+        }
+        return;
+    }
 
     uint8_t t = g_state.tick_in_16th;
     uint8_t step = g_state.step_16th;
@@ -942,6 +948,10 @@ void engine_tick_ppqn(void)
         }
 
         if (step == 0u) g_state.beat1_flash = 4u;
+        if ((step & 3u) == 0u && g_state.ticker_timer > 0u) {
+            g_state.ticker_timer--;
+            if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
+        }
 
         /* Slot 0 always at 1x */
         trigger_slot_step(0u, step);

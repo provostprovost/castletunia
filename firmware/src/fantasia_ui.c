@@ -529,10 +529,7 @@ void ui_render(void)
             g_state.dirty_party = 1u;
         }
     }
-    if (g_state.ticker_timer > 0u) {
-        g_state.ticker_timer--;
-        if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
-    } else {
+    if (g_state.ticker_timer == 0u) {
         g_state.dirty_ticker = 1u;
     }
 
