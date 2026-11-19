@@ -401,11 +401,10 @@ void seed_commit_capture(void)
     };
     engine_set_ticker(ATK_MSG[s]);
 
-    /* Trigger Boss Counter-Attack once all 3 Party members are active */
-    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u &&
-        (s == 2u || g_state.slots[2].note_count > 0u)) {
-        g_state.boss_curse_bars = 2u;
-        g_state.boss_atk_timer = 36u;
+    /* Trigger Boss Counter-Attack once all 3 Party members have finished their turn */
+    if (s == 2u && g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u) {
+        g_state.boss_curse_bars = 1u;
+        g_state.boss_atk_timer = 24u;
         g_state.shake_timer = 10u;
         g_state.shake_amp = 2u;
         dsp_boss_attack_sfx(g_state.settings.zone_id);
