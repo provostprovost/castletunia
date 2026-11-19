@@ -72,10 +72,10 @@ uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
     int32_t midi = 36 + (int32_t)(g_state.settings.root_semitone % 12u)
                  + oct * 12 + (int32_t)z->scale_semitones[d];
 
-    /* Party Register Clamping: Slot 0 (52..71), Slot 1 (60..79), Slot 2 (67..88) */
-    int32_t lo = 52, hi = 71;
-    if (slot == 1u) { lo = 60; hi = 79; }
-    else if (slot >= 2u) { lo = 67; hi = 88; }
+    /* Wider 2-octave Party registers so ascending/descending tunes don't wrap mid-phrase */
+    int32_t lo = 48, hi = 72;
+    if (slot == 1u) { lo = 57; hi = 84; }
+    else if (slot >= 2u) { lo = 62; hi = 91; }
 
     while (midi < lo) midi += 12;
     while (midi > hi) midi -= 12;
@@ -116,8 +116,8 @@ static void update_drone_pitch(void)
     uint8_t fifth_iv = (uint8_t)((fifth_off + 12u - z->scale_semitones[d]) % 12u);
 
     uint8_t root = (uint8_t)(48u + root_off);
-    uint8_t third = (uint8_t)(root + third_iv);
-    uint8_t fifth = (uint8_t)(root + fifth_iv);
+    uint8_t third = (uint8_t)(root + third_iv + 12u); /* Upper-octave voicing so chord changes cut through */
+    uint8_t fifth = (uint8_t)(root + fifth_iv + 12u);
     uint8_t fifth_en = (g_state.settings.harmony >= 20u) ? 1u : 0u;
     uint8_t third_en = (g_state.settings.harmony >= 35u) ? 1u : 0u;
     dsp_drone_set(root, third, fifth, third_en, fifth_en, g_state.settings.mix_drone);
@@ -287,26 +287,14 @@ static void apply_drift_to_slot(SeedSlot *sl, uint8_t drift)
     int32_t c_root = (int32_t)(g_state.active_chord_deg % 7u);
     deg = snap_to_chord_gravity(deg, c_root);
 
-    /* 2. Guided Musical Variation (prevents stale repetition while staying harmonic) */
-    static const int8_t HARMONIC_STEPS[4] = {0, 2, 4, 7};
-    if (drift <= 40u) {
-        /* Gentle chord-tone neighbor or octave breath */
+    /* 2. Stepwise Motif-Preserving Variation (avoids jagged random leaps) */
+    if (drift <= 45u) {
         if ((r & 3u) == 0u) {
-            deg += ((r & 4u) ? 2 : -2);
+            deg += ((r & 4u) ? 1 : -1);
         }
-    } else if (drift <= 75u) {
-        /* Arpeggio inversion or 3rd/5th harmony jump */
-        int32_t jump = HARMONIC_STEPS[(r >> 4) & 3u];
-        deg = c_root + ((deg >= 7) ? 7 : 0) + jump;
     } else {
-        /* High evolution: counter-melody step + rhythmic syncopation on 8th grid */
-        deg = c_root + HARMONIC_STEPS[(r >> 4) & 3u] + (((r >> 8) & 1u) ? 7 : 0);
-        uint8_t cand = (uint8_t)(((sl->step_pos[idx] + 2u) % sl->base_length) & 14u);
-        uint8_t occ = 0u;
-        for (uint8_t k = 0; k < sl->note_count; k++) {
-            if (k != idx && sl->step_pos[k] == cand) occ = 1u;
-        }
-        if (!occ) sl->step_pos[idx] = cand;
+        int32_t step_dir = ((r & 4u) ? 1 : -1);
+        deg = snap_to_chord_gravity(deg + step_dir, c_root);
     }
 
     if (deg < 0) deg = 0;
@@ -780,12 +768,15 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 break;
             }
         }
-        /* Density blooming (65..100%) on empty 16ths */
+        /* Density blooming (65..100%) adds gentle stepwise passing tones */
         if (deg < 0 && eff_density >= 65u) {
-            if ((engine_prng() % 100u) < (uint32_t)(eff_density - 55u)) {
-                static const int8_t ORN[3] = {2, 4, 7};
+            if ((engine_prng() % 100u) < (uint32_t)(eff_density - 58u)) {
+                static const int8_t ORN[3] = {1, -1, 2};
                 int8_t base = sl->scale_deg[0];
-                if (base >= 0) deg = base + ORN[engine_prng() % 3u];
+                if (base >= 0) {
+                    deg = base + ORN[engine_prng() % 3u];
+                    vel_pct = 65u;
+                }
             }
         }
     }
@@ -797,7 +788,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     int32_t c_root = (int32_t)g_state.active_chord_deg;
 
     if (s == 0u) {
-        /* Fighter (Bass): Only synthesize walking bass for 1-note seeds; multi-note phrases keep user melody */
+        /* Fighter (Bass): 1-note seeds walk; multi-note phrases keep user melody on A/A, follow chord on B/C */
         if (sl->note_count == 1u) {
             if (step == 0u) {
                 deg = c_root;
@@ -806,9 +797,11 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 uint8_t w_idx = (uint8_t)(((step >> 2) + form_bar) & 3u);
                 deg = c_root + BASS_WALK[w_idx];
             }
+        } else if (form_bar == 1u || (form_bar == 3u && step >= 12u)) {
+            deg = snap_to_chord_gravity(deg, c_root);
         }
     } else if (s == 1u) {
-        /* Cleric (Arpeggio): Rotate RPG arpeggios for 1-note seeds; multi-note phrases keep user melody */
+        /* Cleric: 1-note seeds arpeggiate; multi-note phrases answer/cadence with chord on B/C */
         static const int8_t ARP_SHAPES[4][4] = {
             {0, 2, 4, 7}, /* Bar 0: Rising Prelude */
             {7, 4, 2, 0}, /* Bar 1: Falling Cascade */
@@ -818,14 +811,18 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
         if (sl->note_count == 1u && g_state.settings.harmony >= 25u) {
             uint8_t shape = (uint8_t)((form_bar + (g_state.settings.drift > 50u ? (engine_prng() & 1u) : 0u)) & 3u);
             deg = c_root + ARP_SHAPES[shape][(step >> 1) & 3u];
+        } else if (form_bar == 1u) {
+            deg = snap_to_chord_gravity(deg + 1, c_root);
+        } else if (form_bar == 3u && step >= 12u) {
+            deg = snap_to_chord_gravity(deg, c_root);
         }
     } else {
-        /* Sorceress (Lead): Plays motif on Bars 0 & 2 (Call), guided Answer on Bar 1, Cadence on Bar 3 */
+        /* Sorceress (Lead): Plays motif on Bars 0 & 2 (Call), stepwise Answer on Bar 1, Cadence on Bar 3 */
         if (form_bar == 1u) {
-            deg = snap_to_chord_gravity(deg + 2, c_root); /* Third harmony answer */
+            deg = snap_to_chord_gravity(deg + 1, c_root);
         } else if (form_bar == 3u) {
-            deg = (step >= 12u) ? (c_root + 7) : snap_to_chord_gravity(deg + 4, c_root);
-        } else if (g_state.settings.harmony >= 40u) {
+            deg = (step >= 12u) ? (c_root + 4) : snap_to_chord_gravity(deg + 2, c_root);
+        } else if (g_state.settings.harmony >= 45u) {
             deg = snap_to_chord_gravity(deg, c_root);
         }
     }

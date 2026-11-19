@@ -103,9 +103,9 @@ static void run_stage1(void)
         uint8_t n0 = engine_note_for_degree(d, 0);
         uint8_t n1 = engine_note_for_degree(d, 1);
         uint8_t n2 = engine_note_for_degree(d, 2);
-        assert(n0 >= 52 && n0 <= 71);
-        assert(n1 >= 60 && n1 <= 79);
-        assert(n2 >= 67 && n2 <= 88);
+        assert(n0 >= 48 && n0 <= 72);
+        assert(n1 >= 57 && n1 <= 84);
+        assert(n2 >= 62 && n2 <= 91);
     }
 
     /* 3. Silence-triggered 1..16 note Seed planting (>= 28 ticks AND >= 850 ms) */
