@@ -427,7 +427,6 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t bg_mix = drone + p_mix;
     int32_t pv[3] = { v0 >> 1, v1 >> 1, (v2 * 3) >> 3 };
     if (g_state.capture.active || g_state.held_keys_mask != 0u) {
-        bg_mix >>= 2;
         uint8_t act = g_state.next_slot % 3u;
         for (uint8_t s = 0; s < 3u; s++) {
             pv[s] = (s == act) ? (pv[s] + (pv[s] >> 1)) : (pv[s] >> 2);
