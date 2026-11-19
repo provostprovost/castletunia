@@ -12,9 +12,13 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 - **6 Tactile Spells & Zero-Menu Macro Controls:** Cast **Haste (`1.5×`)**, **Mirror** (flips Party & Boss + reverses step order), **Shatter** (crystalline SFX + pattern fracture), **Resolve** (`V → I` cadence), and **Toll** (zone boss bell), plus 7 one-knob-per-function encoders (`Intensity`, `Drift`, `Density`, `Harmony`, `Weave`, `BPM`).
 - **`240×240` 256-Color Boot Splash & Live Battle HUD:** Boots into a skippable 3-second pixel-art splash screen, then displays the live animated battle scene, per-character activity meters, status badges (`FRZ` / `HST` / `RDY`), and beat-synced battle ticker.
 
-| Boot Splash | The Crypt | Battle HUD | The Castle | Coronation |
+| Boot Splash | 0 · The Crypt | 1 · The Tavern | 2 · The Tundra | 3 · The Sands |
 |---|---|---|---|---|
-| ![Boot Splash](assets/screenshots/splash.png) | ![The Crypt](assets/screenshots/crypt.png) | ![Battle HUD](assets/screenshots/battle.png) | ![The Castle](assets/screenshots/castle.png) | ![Coronation](assets/screenshots/coronation.png) |
+| ![Boot Splash](assets/screenshots/splash.png) | ![The Crypt](assets/screenshots/zone_0_crypt.png) | ![The Tavern](assets/screenshots/zone_1_tavern.png) | ![The Tundra](assets/screenshots/zone_2_tundra.png) | ![The Sands](assets/screenshots/zone_3_sands.png) |
+
+| 4 · The Glade | 5 · The Castle | 6 · Coronation | 7 · The Spire | 8 · Boss |
+|---|---|---|---|---|
+| ![The Glade](assets/screenshots/zone_4_glade.png) | ![The Castle](assets/screenshots/zone_5_castle.png) | ![Coronation](assets/screenshots/zone_6_coronation.png) | ![The Spire](assets/screenshots/zone_7_spire.png) | ![Boss](assets/screenshots/zone_8_boss.png) |
 
 ---
 
