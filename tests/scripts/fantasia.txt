@@ -1,0 +1,18 @@
+# Fantasia host test script: Seed planting, Zone switching, Spells & Freeze
+200 keys 1
+350 keys 0
+500 keys 16
+650 keys 0
+800 keys 128
+950 keys 0
+2400 shot
+2600 enc 0 3
+3200 btn 8
+3600 btn 6
+3800 btn 2
+4500 shot
+4800 enc 0 5
+5400 btn 5
+5800 btn 7
+6200 shot
+7000 end

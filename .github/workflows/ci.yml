@@ -1,0 +1,48 @@
+name: Fantasia Host TDD & Emulator CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  host-tdd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Pillow
+        run: pip install Pillow
+      - name: Generate 16-bit SNES assets
+        run: python3 tools/gen_assets.py
+      - name: Run TDD Stage 1 (9-Zone Tables & Generative Engine)
+        run: |
+          mkdir -p build
+          gcc -DSTANDALONE_TEST -O2 -Wall -Wextra -Werror=double-promotion -Ifirmware/src \
+            firmware/src/fantasia_zones.c firmware/src/fantasia_engine.c tests/test_fantasia.c \
+            -DTEST_STAGE=1 -o build/test_s1
+          ./build/test_s1
+      - name: Run TDD Stage 2 (32-Bit Fixed-Point DSP)
+        run: |
+          gcc -DSTANDALONE_TEST -O2 -Wall -Wextra -Ifirmware/src \
+            firmware/src/fantasia_zones.c firmware/src/fantasia_engine.c firmware/src/fantasia_dsp.c tests/test_fantasia.c \
+            -DTEST_STAGE=2 -o build/test_s2 -lm
+          ./build/test_s2
+      - name: Run TDD Stage 3 (Assets & Differential SNES UI)
+        run: |
+          gcc -DSTANDALONE_TEST -O2 -Wall -Wextra -Ifirmware/src \
+            firmware/src/fantasia_zones.c firmware/src/fantasia_engine.c firmware/src/fantasia_ui.c tests/test_fantasia.c \
+            -DTEST_STAGE=3 -o build/test_s3
+          ./build/test_s3
+      - name: Run TDD Stage 4 (Panel Input, LEDs & Integration)
+        run: |
+          gcc -DSTANDALONE_TEST -O2 -Wall -Wextra -Ifirmware/src \
+            firmware/src/fantasia_zones.c firmware/src/fantasia_engine.c firmware/src/fantasia_dsp.c \
+            firmware/src/fantasia_input.c firmware/src/fantasia_ui.c tests/test_fantasia.c \
+            -DTEST_STAGE=4 -o build/test_s4
+          ./build/test_s4
+      - name: Run Dinghy Host Emulator (Fantasia Scenario)
+        run: sh tests/run_host.sh tests/scripts/fantasia.txt

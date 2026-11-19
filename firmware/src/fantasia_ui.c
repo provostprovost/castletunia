@@ -24,6 +24,7 @@ static uint16_t g_sprite_buf[32 * 36];      /* 2304 B */
 static uint16_t g_patch_buf[4 * 4];         /* 32 B */
 static AmbientParticle g_particles[NUM_PARTICLES];
 static uint8_t g_hud_frame_drawn = 0;
+static uint8_t g_last_haste = 0;
 
 static uint16_t hud_bg_color(int y)
 {
@@ -260,9 +261,13 @@ void ui_init(void)
 
 void ui_render(void)
 {
-    if (!g_hud_frame_drawn) {
+    if (!g_hud_frame_drawn || g_state.spells.haste_active != g_last_haste) {
+        g_last_haste = g_state.spells.haste_active;
         render_hud_border();
         g_hud_frame_drawn = 1;
+        g_state.dirty_header = 1u;
+        g_state.dirty_party = 1u;
+        g_state.dirty_ticker = 1u;
     }
 
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u || g_state.toll_ring_timer > 0u) {
