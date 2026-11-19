@@ -48,6 +48,52 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .high_mask_battle= 0xAAAAu,
         .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740}
     },
+    /* Zone 6: THE TUNDRA - Winter Synth */
+    {
+        .name = "THE TUNDRA",
+        .subgenre_id = 6,
+        .default_bpm = 76,
+        .scale_semitones = {0, 2, 3, 5, 7, 8, 10},
+        .mid_prog = {0, 4, 5, 2},
+        .high_prog = {0, 4, 5, 6},
+        .reverb_mix = 115,
+        .reverb_fb = 27800,
+        .party_patches = {
+            {1, 1, 12000,  2000, 300, 32680, 22000, 32000}, /* Tundra Fighter: deep warm sub-bass */
+            {8, 1, 22000,     0,  80, 32560,  7000, 32450}, /* Tundra Cleric: high icicle glockenspiel */
+            {2, 1,  8000,     0, 950, 32720, 26000, 32500}  /* Tundra Sorceress: pure frost whistle */
+        },
+        .perc_low  = { 750,  150, 32300,  1200, 1,  4000, 32757},
+        .perc_high = {4500, 2200, 27500, 29000, 4, 18000, 32742},
+        .low_mask_march  = 0x0001u,
+        .high_mask_march = 0x0404u,
+        .low_mask_battle = 0x0101u,
+        .high_mask_battle= 0x2424u,
+        .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740}
+    },
+    /* Zone 4: THE SANDS - Desert / Tomb */
+    {
+        .name = "THE SANDS",
+        .subgenre_id = 4,
+        .default_bpm = 100,
+        .scale_semitones = {0, 1, 4, 5, 7, 8, 10},
+        .mid_prog = {0, 1, 6, 0},
+        .high_prog = {0, 1, 3, 6},
+        .reverb_mix = 78,
+        .reverb_fb = 24800,
+        .party_patches = {
+            {2, 1, 20000, 10000, 120, 32580, 16000, 31700}, /* Sands Fighter: balanced desert sitar/oud */
+            {5, 1, 24000,     0,  80, 32640, 22000, 32350}, /* Sands Cleric: louder desert finger-cymbal */
+            {3, 2, 16000,  4000, 500, 32690, 22000, 32300}  /* Sands Sorceress: nasal desert horn */
+        },
+        .perc_low  = {1200,  400, 31000,  3000, 2, 10000, 32753},
+        .perc_high = {3500, 1800, 28500, 22000, 3, 10000, 32726},
+        .low_mask_march  = 0x0841u,
+        .high_mask_march = 0x2222u,
+        .low_mask_battle = 0x4849u,
+        .high_mask_battle= 0xB6B6u,
+        .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740}
+    },
     /* Zone 2: THE GLADE - Woodland Synth */
     {
         .name = "THE GLADE",
@@ -94,27 +140,27 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .high_mask_battle= 0x5555u,
         .toll_patch = {11, 4, 42000, 0, 64, 32745, 0, 32740}
     },
-    /* Zone 4: THE SANDS - Desert / Tomb */
+    /* Zone 7: CORONATION - Royal Fanfare */
     {
-        .name = "THE SANDS",
-        .subgenre_id = 4,
-        .default_bpm = 100,
-        .scale_semitones = {0, 1, 4, 5, 7, 8, 10},
-        .mid_prog = {0, 1, 6, 0},
-        .high_prog = {0, 1, 3, 6},
-        .reverb_mix = 78,
-        .reverb_fb = 24800,
+        .name = "CORONATION",
+        .subgenre_id = 7,
+        .default_bpm = 116,
+        .scale_semitones = {0, 2, 4, 5, 7, 9, 11},
+        .mid_prog = {0, 4, 5, 3},
+        .high_prog = {0, 4, 5, 1},
+        .reverb_mix = 64,
+        .reverb_fb = 23500,
         .party_patches = {
-            {2, 1, 20000, 10000, 120, 32580, 16000, 31700}, /* Sands Fighter: balanced desert sitar/oud */
-            {5, 1, 24000,     0,  80, 32640, 22000, 32350}, /* Sands Cleric: louder desert finger-cymbal */
-            {3, 2, 16000,  4000, 500, 32690, 22000, 32300}  /* Sands Sorceress: nasal desert horn */
+            {1, 1, 30000, 16000, 140, 32650, 25000, 31800}, /* Coronation Fighter: royal trumpet */
+            {2, 1, 26000, 12000, 180, 32640, 23000, 31900}, /* Coronation Cleric: french horn brass */
+            {1, 1, 24000, 10000, 220, 32660, 24000, 32000}  /* Coronation Sorceress: brass fanfare lead */
         },
-        .perc_low  = {1200,  400, 31000,  3000, 2, 10000, 32753},
-        .perc_high = {3500, 1800, 28500, 22000, 3, 10000, 32726},
-        .low_mask_march  = 0x0841u,
-        .high_mask_march = 0x2222u,
-        .low_mask_battle = 0x4849u,
-        .high_mask_battle= 0xB6B6u,
+        .perc_low  = { 880,  220, 32100,   900, 1,  5000, 32755},
+        .perc_high = {2800, 1400, 29000, 25000, 3, 15000, 32738},
+        .low_mask_march  = 0x0505u,
+        .high_mask_march = 0x5050u,
+        .low_mask_battle = 0x1515u,
+        .high_mask_battle= 0xF5F5u,
         .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740}
     },
     /* Zone 5: THE SPIRE - Crystal / Arcane */
@@ -139,52 +185,6 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .low_mask_battle = 0x0909u,
         .high_mask_battle= 0x4949u,
         .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740}
-    },
-    /* Zone 6: THE TUNDRA - Winter Synth */
-    {
-        .name = "THE TUNDRA",
-        .subgenre_id = 6,
-        .default_bpm = 76,
-        .scale_semitones = {0, 2, 3, 5, 7, 8, 10},
-        .mid_prog = {0, 4, 5, 2},
-        .high_prog = {0, 4, 5, 6},
-        .reverb_mix = 115,
-        .reverb_fb = 27800,
-        .party_patches = {
-            {1, 1, 12000,  2000, 300, 32680, 22000, 32000}, /* Tundra Fighter: deep warm sub-bass */
-            {8, 1, 22000,     0,  80, 32560,  7000, 32450}, /* Tundra Cleric: high icicle glockenspiel */
-            {2, 1,  8000,     0, 950, 32720, 26000, 32500}  /* Tundra Sorceress: pure frost whistle */
-        },
-        .perc_low  = { 750,  150, 32300,  1200, 1,  4000, 32757},
-        .perc_high = {4500, 2200, 27500, 29000, 4, 18000, 32742},
-        .low_mask_march  = 0x0001u,
-        .high_mask_march = 0x0404u,
-        .low_mask_battle = 0x0101u,
-        .high_mask_battle= 0x2424u,
-        .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740}
-    },
-    /* Zone 7: CORONATION - Royal Fanfare */
-    {
-        .name = "CORONATION",
-        .subgenre_id = 7,
-        .default_bpm = 116,
-        .scale_semitones = {0, 2, 4, 5, 7, 9, 11},
-        .mid_prog = {0, 4, 5, 3},
-        .high_prog = {0, 4, 5, 1},
-        .reverb_mix = 64,
-        .reverb_fb = 23500,
-        .party_patches = {
-            {1, 1, 30000, 16000, 140, 32650, 25000, 31800}, /* Coronation Fighter: royal trumpet */
-            {2, 1, 26000, 12000, 180, 32640, 23000, 31900}, /* Coronation Cleric: french horn brass */
-            {1, 1, 24000, 10000, 220, 32660, 24000, 32000}  /* Coronation Sorceress: brass fanfare lead */
-        },
-        .perc_low  = { 880,  220, 32100,   900, 1,  5000, 32755},
-        .perc_high = {2800, 1400, 29000, 25000, 3, 15000, 32738},
-        .low_mask_march  = 0x0505u,
-        .high_mask_march = 0x5050u,
-        .low_mask_battle = 0x1515u,
-        .high_mask_battle= 0xF5F5u,
-        .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740}
     },
     /* Zone 8: BOSS - 16-Bit Battle */
     {

@@ -71,7 +71,7 @@ static uint16_t boss_atk_tint(uint8_t z)
         0xFFE0u, /* 7 Coronation: radiant gold */
         0xF810u  /* 8 Chaos: magenta meteor */
     };
-    return TINTS[z % 9u];
+    return TINTS[zone_get(z)->subgenre_id % 9u];
 }
 
 static int boss_atk_ripple_dx(int y)

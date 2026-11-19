@@ -717,10 +717,12 @@ def main():
     PREVIEWS.mkdir(parents=True, exist_ok=True)
     OUT_H.parent.mkdir(parents=True, exist_ok=True)
 
+    # Contrasting zone progression: Crypt -> Tavern -> Tundra -> Sands -> Glade -> Castle -> Coronation -> Spire -> Boss
+    ZONE_ORDER = [0, 1, 6, 4, 2, 3, 7, 5, 8]
     zones_idx = []
     zones_pal = []
     for z in range(9):
-        idx, pal = load_or_gen_zone(z)
+        idx, pal = load_or_gen_zone(ZONE_ORDER[z])
         zones_idx.append(pack_nibbles(idx))
         zones_pal.append([rgb_to_565(*c) for c in pal])
 
@@ -749,7 +751,7 @@ def main():
     party_32, party_pals, atk_grids, atk_pals = load_party_sprites()
     boss_grids, boss_pals = [], []
     for z in range(9):
-        bg_grid, bg_pal = load_boss_sprite(z)
+        bg_grid, bg_pal = load_boss_sprite(ZONE_ORDER[z])
         boss_grids.append(pack_nibbles(bg_grid))
         boss_pals.append(bg_pal)
     splash_pal, splash_data = load_splash()

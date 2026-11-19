@@ -206,7 +206,7 @@ void dsp_boss_attack_sfx(uint8_t zone_id)
         {13, 3, 60000, 16000, 64, 32500, 0, 22000} /* 8 Chaos (Demon): meteor impact */
     };
     static const uint8_t NOTES[9] = { 42u, 55u, 64u, 48u, 67u, 73u, 81u, 72u, 38u };
-    uint8_t z = zone_id % 9u;
+    uint8_t z = zone_get(zone_id)->subgenre_id % 9u;
     start_fm_voice(&g_toll, &BOSS_SFX[z], NOTES[z], 30000u, 20u);
 }
 
@@ -405,7 +405,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
         grit = (int32_t)(g_state.settings.intensity - 50u) * 240;
     }
     if (g_state.boss_curse_bars > 0u) {
-        uint8_t zc = g_state.settings.zone_id % 9u;
+        uint8_t zc = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
         if (zc == 3u || zc == 8u || zc == 1u) grit += 12000;
     }
     /* Sorceress (slot 2) gets gentle magical vibrato shimmer */
@@ -447,7 +447,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
 
     uint16_t rev_mix = g_state.settings.reverb_override ? (uint16_t)(g_state.settings.reverb_override << 8) : (uint16_t)(z->reverb_mix << 8);
     if (g_state.boss_curse_bars > 0u) {
-        uint8_t zc = g_state.settings.zone_id % 9u;
+        uint8_t zc = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
         if (zc == 0u || zc == 5u || zc == 6u) rev_mix = 32000u; /* Cathedral/Arcane/Blizzard reverb surge */
     }
     int32_t mix_l = dry_l + q15_mul(ap_l, (int32_t)rev_mix);

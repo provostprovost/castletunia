@@ -422,7 +422,7 @@ void seed_commit_capture(void)
             "> VAMPIRE: BLOOD MOON!", "> DJINN: SANDSTORM!", "> BEHOLDER: WARP!",
             "> WYRM: BLIZZARD!", "> SERAPH: JUDGMENT!", "> DEMON: METEOR!"
         };
-        engine_set_ticker(BOSS_ATK_MSG[g_state.settings.zone_id % 9u]);
+        engine_set_ticker(BOSS_ATK_MSG[zone_get(g_state.settings.zone_id)->subgenre_id % 9u]);
     }
 }
 
@@ -725,7 +725,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     uint8_t vel_pct = 100u;
 
     uint8_t boss_active = (g_state.boss_curse_bars > 0u) ? 1u : 0u;
-    uint8_t zc = g_state.settings.zone_id % 9u;
+    uint8_t zc = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
     uint8_t eff_density = g_state.settings.density;
     if (boss_active && (zc == 2u || zc == 7u || zc == 8u)) {
         eff_density = 100u; /* Overgrow / Judgment / Meteor density surge */
@@ -913,14 +913,14 @@ void engine_tick_ppqn(void)
 
     /* Swing calculation for Weave 21..60% (or Barrel Mimic Boss Brawl) */
     uint8_t swing_ticks = 0u;
-    uint8_t eff_weave = (g_state.boss_curse_bars > 0u && (g_state.settings.zone_id % 9u) == 1u)
+    uint8_t eff_weave = (g_state.boss_curse_bars > 0u && (zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 1u)
                       ? 58u : g_state.settings.weave;
     if (eff_weave >= 15u && eff_weave <= 65u) {
         swing_ticks = (uint8_t)(1u + (eff_weave - 15u) / 15u);
         if (swing_ticks > 3u) swing_ticks = 3u;
     }
     uint8_t eff_haste = g_state.spells.haste_active ||
-                        (g_state.boss_curse_bars > 0u && ((g_state.settings.zone_id % 9u) == 5u || (g_state.settings.zone_id % 9u) == 8u));
+                        (g_state.boss_curse_bars > 0u && ((zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 5u || (zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 8u));
 
     uint8_t fire_main = 0u;
     uint8_t pair_tick = (uint8_t)((step & 1u) * 6u + t);
@@ -974,7 +974,7 @@ void engine_tick_ppqn(void)
         uint8_t inten = g_state.settings.intensity;
         uint8_t dens = g_state.settings.density;
         if (g_state.boss_curse_bars > 0u) {
-            uint8_t zc = g_state.settings.zone_id % 9u;
+            uint8_t zc = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
             if (zc == 1u || zc == 4u || zc == 7u || zc == 8u) inten = 95u; /* Battle fills */
         }
         if (inten >= 15u && g_state.settings.mix_perc > 0u) {
