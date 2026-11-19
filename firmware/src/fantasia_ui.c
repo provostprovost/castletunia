@@ -58,25 +58,64 @@ static int boss_hover_dy(uint8_t phase)
     return (int)BOB[(phase >> 1) & 15u];
 }
 
+static uint16_t boss_atk_tint(uint8_t z)
+{
+    static const uint16_t TINTS[9] = {
+        0x781Fu, /* 0 Crypt: spectral purple */
+        0xFC00u, /* 1 Tavern: amber ale */
+        0x07E4u, /* 2 Glade: emerald overgrow */
+        0xF800u, /* 3 Castle: crimson blood moon */
+        0xFD20u, /* 4 Sands: golden sandstorm */
+        0x07FFu, /* 5 Spire: cyan void warp */
+        0x867Fu, /* 6 Tundra: ice frost */
+        0xFFE0u, /* 7 Coronation: radiant gold */
+        0xF810u  /* 8 Chaos: magenta meteor */
+    };
+    return TINTS[z % 9u];
+}
+
+static int boss_atk_ripple_dx(int y)
+{
+    static const int8_t SIN16[16] = {0, 2, 4, 5, 6, 5, 4, 2, 0, -2, -4, -5, -6, -5, -4, -2};
+    if (g_state.boss_atk_timer == 0u) return 0;
+    int s = (int)SIN16[((y >> 2) + (int)g_state.boss_atk_timer) & 15];
+    return (s * (int)(g_state.boss_atk_timer + 7u)) >> 5;
+}
+
+static uint16_t apply_boss_atk_fx(uint16_t c, uint8_t z)
+{
+    if (g_state.boss_atk_timer == 0u) return c;
+    uint16_t tint = boss_atk_tint(z);
+    if (g_state.boss_atk_timer > 28u && (g_state.boss_atk_timer & 2u)) {
+        c ^= 0x39E7u;
+    }
+    return (uint16_t)(((c & 0xF7DEu) >> 1) + ((tint & 0xF7DEu) >> 1));
+}
+
 static void render_battle_sprites(void)
 {
     uint8_t z = g_state.settings.zone_id % 9u;
     uint8_t mirror = g_state.spells.mirror_active;
 
-    /* 1. Boss on left/center (x=16..111, y=34..129) */
+    /* 1. Boss on left/center (x=16..111, wider during counter-attack lunge) */
     int bx = 16;
-    if (g_state.boss_hit_timer > 0u) {
+    if (g_state.boss_atk_timer > 0u) {
+        bx += (g_state.boss_atk_timer > 24u) ? 18 : ((g_state.boss_atk_timer > 12u) ? 12 : 5);
+    } else if (g_state.boss_hit_timer > 0u) {
         bx += (g_state.boss_hit_timer & 1u) ? -3 : 3;
     }
+    int boss_lane_w = (g_state.boss_atk_timer > 0u) ? 116 : 96;
     int by_base = 34;
     int by = by_base + boss_hover_dy(g_boss_phase);
 
     for (int strip = 0; strip < 104; strip += 4) {
         for (int r = 0; r < 4; r++) {
             int sy_scr = (by_base - 4) + strip + r;
-            for (int c = 0; c < 96; c++) {
+            int rip = boss_atk_ripple_dx(sy_scr);
+            for (int c = 0; c < boss_lane_w; c++) {
                 int sx_scr = 16 + c;
-                uint16_t bg = sample_diorama_px(z, sx_scr >> 1, sy_scr >> 1, mirror);
+                uint16_t bg = apply_boss_atk_fx(
+                    sample_diorama_px(z, (sx_scr + rip) >> 1, sy_scr >> 1, mirror), z);
                 int b_x = sx_scr - bx;
                 int b_y = sy_scr - by;
                 if (b_x >= 0 && b_x < 96 && b_y >= 0 && b_y < 96) {
@@ -85,8 +124,13 @@ static void render_battle_sprites(void)
                     uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
                     uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                     if (ci != 0u) {
-                        bg = (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u)
-                           ? 0xFFFFu : fantasia_assets.boss_pals[z][ci];
+                        if (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u) {
+                            bg = 0xFFFFu;
+                        } else if (g_state.boss_atk_timer > 18u && (g_state.boss_atk_timer & 2u)) {
+                            bg = fantasia_assets.boss_pals[z][ci] ^ 0x39E7u;
+                        } else {
+                            bg = fantasia_assets.boss_pals[z][ci];
+                        }
                     }
                 }
                 /* Diagonal slash / spell flash on boss hit */
@@ -97,15 +141,16 @@ static void render_battle_sprites(void)
                         bg = 0xFE60u;
                     }
                 }
-                g_sprite_buf[r * 96 + c] = bg;
+                g_sprite_buf[r * boss_lane_w + c] = bg;
             }
         }
-        hal_lcd_blit_rect(16, (by_base - 4) + strip, 96, 4, g_sprite_buf);
+        hal_lcd_blit_rect(16, (by_base - 4) + strip, boss_lane_w, 4, g_sprite_buf);
     }
 
     /* 2. Staggered FFVI Party Column on right (ABOVE the blue menu bar) */
     static const int BASE_X[3] = {174, 182, 190};
     static const int BASE_Y[3] = {24, 68, 112};
+    int party_recoil = (g_state.boss_atk_timer > 20u) ? 4 : ((g_state.boss_atk_timer > 8u) ? 2 : 0);
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         uint8_t atk_t = g_state.attack_timer[s];
         const uint16_t *pal = g_state.slots[s].frozen
@@ -117,18 +162,22 @@ static void render_battle_sprites(void)
             uint8_t frame = (atk_t > 10u) ? 0u : ((atk_t > 5u) ? 1u : 2u);
             spr = fantasia_assets.party_atk[s][frame];
             lunge = (frame == 0u) ? -10 : ((frame == 1u) ? -28 : -16);
+        } else if (party_recoil > 0) {
+            lunge = party_recoil;
         }
         int hop = (g_state.slots[s].anim_timer > 0u && atk_t == 0u) ? -2 : 0;
-        int lane_x = BASE_X[s] - 32; /* 74px wide lane covers lunge */
+        int lane_x = BASE_X[s] - 32; /* 78px wide lane covers lunge + recoil */
         int lane_y = BASE_Y[s] - 2;
         int sx0 = BASE_X[s] + lunge;
 
         for (int strip = 0; strip < 44; strip += 4) {
             for (int r = 0; r < 4; r++) {
                 int sy_scr = lane_y + strip + r;
-                for (int c = 0; c < 74; c++) {
+                int rip = boss_atk_ripple_dx(sy_scr);
+                for (int c = 0; c < 78; c++) {
                     int px_scr = lane_x + c;
-                    uint16_t bg = sample_diorama_px(z, px_scr >> 1, sy_scr >> 1, mirror);
+                    uint16_t bg = apply_boss_atk_fx(
+                        sample_diorama_px(z, (px_scr + rip) >> 1, sy_scr >> 1, mirror), z);
                     int sp_x = px_scr - sx0;
                     int sp_y = sy_scr - (BASE_Y[s] + hop);
                     if (sp_x >= 0 && sp_x < 42 && sp_y >= 0 && sp_y < 42) {
@@ -137,10 +186,10 @@ static void render_battle_sprites(void)
                         uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                         if (ci != 0u) bg = pal[ci];
                     }
-                    g_sprite_buf[r * 74 + c] = bg;
+                    g_sprite_buf[r * 78 + c] = bg;
                 }
             }
-            hal_lcd_blit_rect(lane_x, lane_y + strip, 74, 4, g_sprite_buf);
+            hal_lcd_blit_rect(lane_x, lane_y + strip, 78, 4, g_sprite_buf);
         }
     }
 }
@@ -178,8 +227,9 @@ static void render_diorama_full(void)
 
     for (int y = 0; y < 160; y++) {
         int sy = y >> 1;
+        int rip = boss_atk_ripple_dx(y);
         for (int x = 0; x < 240; x++) {
-            int vx = x + shake_x;
+            int vx = x + shake_x + rip;
             uint16_t c;
             if (slide_off > 0) {
                 int src_x = vx + (240 - slide_off);
@@ -189,7 +239,7 @@ static void render_diorama_full(void)
                     c = sample_diorama_px(z, (src_x - 240) >> 1, sy, mirror);
                 }
             } else {
-                c = sample_diorama_px(z, vx >> 1, sy, mirror);
+                c = apply_boss_atk_fx(sample_diorama_px(z, vx >> 1, sy, mirror), z);
             }
             g_scanline[x] = c;
         }
@@ -392,13 +442,18 @@ void ui_render(void)
         g_state.dirty_ticker = 1u;
     }
 
-    if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u || g_state.toll_ring_timer > 0u) {
+    if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u ||
+        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u) {
         render_diorama_full();
         if (g_state.slide_frames == 0u) render_battle_sprites();
         g_state.dirty_diorama = 0u;
         if (g_state.slide_frames > 0u) g_state.slide_frames--;
         if (g_state.shake_timer > 0u) g_state.shake_timer--;
         if (g_state.toll_ring_timer > 0u) g_state.toll_ring_timer--;
+        if (g_state.boss_atk_timer > 0u) {
+            g_state.boss_atk_timer--;
+            if (g_state.boss_atk_timer == 0u) g_state.dirty_diorama = 1u;
+        }
     } else {
         render_particles();
         g_boss_phase++;

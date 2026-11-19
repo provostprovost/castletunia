@@ -151,6 +151,8 @@ typedef struct {
     uint8_t           slide_prev_zone;
     uint8_t           attack_timer[NUM_PARTY_SLOTS];
     uint8_t           boss_hit_timer;
+    uint8_t           boss_atk_timer;
+    uint8_t           boss_curse_bars;
 } FantasiaState;
 
 #endif /* FANTASIA_TYPES_H */

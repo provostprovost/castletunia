@@ -400,6 +400,22 @@ void seed_commit_capture(void)
         "> FIGHTER: SLASH!", "> CLERIC: HOLY!", "> SORCERESS: FLARE!"
     };
     engine_set_ticker(ATK_MSG[s]);
+
+    /* Trigger Boss Counter-Attack once all 3 Party members are active */
+    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u &&
+        (s == 2u || g_state.slots[2].note_count > 0u)) {
+        g_state.boss_curse_bars = 2u;
+        g_state.boss_atk_timer = 36u;
+        g_state.shake_timer = 10u;
+        g_state.shake_amp = 2u;
+        dsp_boss_attack_sfx(g_state.settings.zone_id);
+        static const char *const BOSS_ATK_MSG[9] = {
+            "> LICH: DOOM!", "> MIMIC: BRAWL!", "> TREANT: OVERGROW!",
+            "> VAMPIRE: BLOOD MOON!", "> DJINN: SANDSTORM!", "> BEHOLDER: WARP!",
+            "> WYRM: BLIZZARD!", "> SERAPH: JUDGMENT!", "> DEMON: METEOR!"
+        };
+        engine_set_ticker(BOSS_ATK_MSG[g_state.settings.zone_id % 9u]);
+    }
 }
 
 void engine_on_key_down(uint8_t key_idx)
@@ -670,6 +686,14 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     int32_t deg = -1;
     uint8_t vel_pct = 100u;
 
+    uint8_t boss_active = (g_state.boss_curse_bars > 0u) ? 1u : 0u;
+    uint8_t zc = g_state.settings.zone_id % 9u;
+    uint8_t eff_density = g_state.settings.density;
+    if (boss_active && (zc == 2u || zc == 7u || zc == 8u)) {
+        eff_density = 100u; /* Overgrow / Judgment / Meteor density surge */
+    }
+    uint8_t eff_mirror = g_state.spells.mirror_active ^ ((boss_active && zc == 3u) ? 1u : 0u);
+
     if (sl->note_count == 1u) {
         /* Single-Note Seed Evolution */
         int8_t base_deg = sl->scale_deg[0];
@@ -680,9 +704,9 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             }
             if (pos == 0u) {
                 deg = base_deg;
-            } else if (pos == 8u && (other_occ || g_state.settings.density > 50u)) {
+            } else if (pos == 8u && (other_occ || eff_density > 50u)) {
                 deg = base_deg + 4;
-            } else if (pos == 12u && g_state.settings.density > 75u) {
+            } else if (pos == 12u && eff_density > 75u) {
                 deg = base_deg + 7;
                 vel_pct = 75u;
             }
@@ -690,13 +714,13 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     } else {
         for (uint8_t i = 0; i < sl->note_count; i++) {
             uint8_t target_pos = sl->step_pos[i];
-            if (g_state.spells.mirror_active) {
+            if (eff_mirror) {
                 target_pos = (uint8_t)((len - 1u - (target_pos % len)) % len);
             }
             if (target_pos == pos) {
                 /* Density thinning (0..35%) while anchoring step 0 */
-                if (g_state.settings.density <= 35u && pos != 0u) {
-                    if ((engine_prng() % 100u) > (uint32_t)(g_state.settings.density * 2u + 25u)) {
+                if (eff_density <= 35u && pos != 0u) {
+                    if ((engine_prng() % 100u) > (uint32_t)(eff_density * 2u + 25u)) {
                         continue;
                     }
                 }
@@ -705,8 +729,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             }
         }
         /* Density blooming (65..100%) on empty 16ths */
-        if (deg < 0 && g_state.settings.density >= 65u) {
-            if ((engine_prng() % 100u) < (uint32_t)(g_state.settings.density - 55u)) {
+        if (deg < 0 && eff_density >= 65u) {
+            if ((engine_prng() % 100u) < (uint32_t)(eff_density - 55u)) {
                 static const int8_t ORN[3] = {2, 4, 7};
                 int8_t base = sl->scale_deg[0];
                 if (base >= 0) deg = base + ORN[engine_prng() % 3u];
@@ -752,7 +776,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
         }
     }
 
-    if (g_state.spells.mirror_active) {
+    if (eff_mirror) {
         deg = (28 - deg) % 27;
         if (deg < 0) deg += 27;
         if (s == 1u && g_state.settings.weave > 60u && g_state.settings.harmony > 50u) {
@@ -765,6 +789,10 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             int32_t d2 = deg - c2; if (d2 < 0) d2 = -d2;
             deg = (d0 <= d1 && d0 <= d2) ? c0 : ((d1 <= d2) ? c1 : c2);
         }
+    }
+    if (boss_active) {
+        if (zc == 0u) deg -= 7;                  /* Crypt Doom: sub-octave drop */
+        else if (zc == 5u || zc == 6u) deg += 7; /* Spire/Tundra: crystal octave surge */
     }
 
     /* Cross-pollination boost */
@@ -817,11 +845,15 @@ void engine_tick_ppqn(void)
     uint8_t t = g_state.tick_in_16th;
     uint8_t step = g_state.step_16th;
 
-    /* Swing calculation for Weave 21..60% */
+    /* Swing calculation for Weave 21..60% (or Barrel Mimic Boss Brawl) */
     uint8_t swing_ticks = 0u;
-    if (g_state.settings.weave >= 21u && g_state.settings.weave <= 60u) {
-        swing_ticks = (uint8_t)((g_state.settings.weave - 20u) / 13u);
+    uint8_t eff_weave = (g_state.boss_curse_bars > 0u && (g_state.settings.zone_id % 9u) == 1u)
+                      ? 58u : g_state.settings.weave;
+    if (eff_weave >= 21u && eff_weave <= 60u) {
+        swing_ticks = (uint8_t)((eff_weave - 20u) / 13u);
     }
+    uint8_t eff_haste = g_state.spells.haste_active ||
+                        (g_state.boss_curse_bars > 0u && ((g_state.settings.zone_id % 9u) == 5u || (g_state.settings.zone_id % 9u) == 8u));
 
     uint8_t fire_main = 0u;
     uint8_t fire_haste = 0u;
@@ -844,6 +876,10 @@ void engine_tick_ppqn(void)
         uint8_t prev_chord = g_state.active_chord_deg;
         if (g_state.spells.resolve_armed) {
             g_state.active_chord_deg = (step < 8u) ? 4u : 0u;
+        } else if (g_state.boss_curse_bars > 0u && ((z->subgenre_id == 4u) || (z->subgenre_id == 8u) || (z->subgenre_id == 0u))) {
+            g_state.active_chord_deg = 1u; /* Dramatic bII Phrygian/Doom tension */
+        } else if (g_state.boss_curse_bars > 0u && z->subgenre_id == 7u) {
+            g_state.active_chord_deg = (step < 8u) ? 3u : 4u; /* Seraph IV->V fanfare */
         } else if (g_state.settings.harmony >= 70u) {
             g_state.active_chord_deg = z->high_prog[bar_idx];
         } else if (g_state.settings.harmony >= 15u) {
@@ -859,14 +895,18 @@ void engine_tick_ppqn(void)
 
         /* Slot 0 always at 1x */
         trigger_slot_step(0u, step);
-        if (!g_state.spells.haste_active) {
+        if (!eff_haste) {
             trigger_slot_step(1u, step);
             trigger_slot_step(2u, step);
         }
 
-        /* Percussion evaluation (sensitive to both Intensity and Density) */
+        /* Percussion evaluation (sensitive to Intensity, Density, and Boss Counter-Attack) */
         uint8_t inten = g_state.settings.intensity;
         uint8_t dens = g_state.settings.density;
+        if (g_state.boss_curse_bars > 0u) {
+            uint8_t zc = g_state.settings.zone_id % 9u;
+            if (zc == 1u || zc == 4u || zc == 7u || zc == 8u) inten = 95u; /* Battle fills */
+        }
         if (inten >= 15u && g_state.settings.mix_perc > 0u) {
             uint16_t low_mask = 0u, high_mask = 0u;
             if (inten <= 45u) {
@@ -894,7 +934,7 @@ void engine_tick_ppqn(void)
         }
     }
 
-    if (g_state.spells.haste_active && fire_haste) {
+    if (eff_haste && fire_haste) {
         uint8_t hstep = (uint8_t)((step * 2u + (t >= 3u ? 1u : 0u)) & 15u);
         trigger_slot_step(1u, hstep);
         trigger_slot_step(2u, hstep);
@@ -909,6 +949,12 @@ void engine_tick_ppqn(void)
             g_state.bar_count++;
             if (g_state.spells.resolve_armed) {
                 g_state.spells.resolve_armed = 0u;
+            }
+            if (g_state.boss_curse_bars > 0u) {
+                g_state.boss_curse_bars--;
+                if (g_state.boss_curse_bars == 0u) {
+                    g_state.dirty_diorama = 1u;
+                }
             }
         }
     }

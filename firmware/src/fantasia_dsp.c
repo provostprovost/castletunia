@@ -192,6 +192,24 @@ void dsp_attack_sfx(uint8_t slot)
     start_fm_voice(&g_toll, &ATK_SFX[s], NOTES[s], 26000u, 10u);
 }
 
+void dsp_boss_attack_sfx(uint8_t zone_id)
+{
+    static const FmPatch BOSS_SFX[9] = {
+        {1, 2, 50000,  4000, 64, 32600, 4, 24000}, /* 0 Crypt (Lich): deep doom toll */
+        {9, 2, 46000, 14000, 64, 31600, 0, 29000}, /* 1 Tavern (Mimic): crunching brawl snap */
+        {4, 3, 38000,  8000, 64, 32300, 3, 27000}, /* 2 Glade (Treant): woody overgrow chime */
+        {3, 2, 52000, 10000, 64, 32400, 5, 28000}, /* 3 Castle (Vampire): dark blood moon organ */
+        {11, 2, 42000, 12000, 64, 32100, 6, 26000}, /* 4 Sands (Djinn): metallic sandstorm */
+        {7, 5, 56000,  6000, 64, 32450, 8, 25000}, /* 5 Spire (Beholder): alien warp beam */
+        {5, 4, 48000,  3000, 64, 32550, 2, 26000}, /* 6 Tundra (Wyrm): crystalline frost shatter */
+        {2, 1, 34000,  2000, 64, 32450, 2, 29000}, /* 7 Coronation (Seraph): radiant judgment brass */
+        {13, 3, 60000, 16000, 64, 32500, 0, 22000} /* 8 Chaos (Demon): meteor impact */
+    };
+    static const uint8_t NOTES[9] = { 42u, 55u, 64u, 48u, 67u, 73u, 81u, 72u, 38u };
+    uint8_t z = zone_id % 9u;
+    start_fm_voice(&g_toll, &BOSS_SFX[z], NOTES[z], 30000u, 20u);
+}
+
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel_q15)
 {
     uint8_t ch = is_high ? 1u : 0u;
@@ -386,6 +404,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     if (g_state.settings.intensity > 50u) {
         grit = (int32_t)(g_state.settings.intensity - 50u) * 240;
     }
+    if (g_state.boss_curse_bars > 0u) {
+        uint8_t zc = g_state.settings.zone_id % 9u;
+        if (zc == 3u || zc == 8u || zc == 1u) grit += 12000;
+    }
     int32_t v0 = render_fm_voice(&g_party[0], &z->party_patches[0], grit);
     int32_t v1 = render_fm_voice(&g_party[1], &z->party_patches[1], grit);
     int32_t v2 = render_fm_voice(&g_party[2], &z->party_patches[2], grit);
@@ -413,6 +435,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t ap_r = allpass_step(g_ap1, AP1_LEN, &g_ap_idx[1], c_r >> 1);
 
     uint16_t rev_mix = g_state.settings.reverb_override ? (uint16_t)(g_state.settings.reverb_override << 8) : (uint16_t)(z->reverb_mix << 8);
+    if (g_state.boss_curse_bars > 0u) {
+        uint8_t zc = g_state.settings.zone_id % 9u;
+        if (zc == 0u || zc == 5u || zc == 6u) rev_mix = 32000u; /* Cathedral/Arcane/Blizzard reverb surge */
+    }
     int32_t mix_l = dry_l + q15_mul(ap_l, (int32_t)rev_mix);
     int32_t mix_r = dry_r + q15_mul(ap_r, (int32_t)rev_mix);
 
