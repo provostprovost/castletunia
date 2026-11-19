@@ -386,10 +386,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix: Party leads forward, Drone & Percussion supportive */
+    /* Stereo mix: Fighter & Cleric boosted, Sorceress shimmering, Drone & Perc supportive */
     int32_t p_mix = (pl >> 2) + (ph >> 2);
-    int32_t dry_l = (drone >> 1) + ((v0 * 3) >> 2) + v1 + v2 + (v2 >> 2) + (vt >> 1) + p_mix;
-    int32_t dry_r = (drone >> 1) + ((v0 * 3) >> 2) + v1 + v2 + (v2 >> 2) + (vt >> 1) + p_mix;
+    int32_t dry_l = (drone >> 1) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
+    int32_t dry_r = (drone >> 1) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
 
     /* 4. Schroeder 4-Comb + 2-Allpass Room Reverb */
     int32_t rev_in = (dry_l + dry_r) >> 2;
