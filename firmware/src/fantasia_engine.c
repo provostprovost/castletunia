@@ -69,18 +69,14 @@ uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
     while (d < 0) { d += 7; oct--; }
     while (d >= 7) { d -= 7; oct++; }
 
-    int32_t midi = 36 + (int32_t)(g_state.settings.root_semitone % 12u)
+    /* Strictly monotonic 27-key mapping per Party role (no octave wrap cliffs!) */
+    static const int32_t SLOT_BASE[3] = { 48, 55, 60 }; /* Fighter=C3+, Cleric=G3+, Sorceress=C4+ */
+    int32_t base = SLOT_BASE[slot % 3u];
+    int32_t midi = base + (int32_t)(g_state.settings.root_semitone % 12u)
                  + oct * 12 + (int32_t)z->scale_semitones[d];
 
-    /* Wider 2-octave Party registers so ascending/descending tunes don't wrap mid-phrase */
-    int32_t lo = 48, hi = 72;
-    if (slot == 1u) { lo = 57; hi = 84; }
-    else if (slot >= 2u) { lo = 62; hi = 91; }
-
-    while (midi < lo) midi += 12;
-    while (midi > hi) midi -= 12;
-    if (midi < 0) midi = 0;
-    if (midi > 127) midi = 127;
+    if (midi < 24) midi = 24;
+    if (midi > 108) midi = 108;
     return (uint8_t)midi;
 }
 
@@ -447,9 +443,7 @@ void engine_on_key_down(uint8_t key_idx)
     }
 
     uint8_t midi = engine_note_for_degree((int32_t)key_idx, target_slot);
-    /* Ensure live key audition is above 196 Hz so it projects clearly on 28mm speaker */
-    uint8_t aud_midi = (midi < 55u) ? (uint8_t)(midi + 12u) : midi;
-    dsp_note_on(target_slot, aud_midi, 32767u, 72u);
+    dsp_note_on(target_slot, midi, 32767u, 72u);
 
     if (!g_state.capture.active) {
         g_state.capture.active = 1u;

@@ -98,14 +98,18 @@ static void run_stage1(void)
         assert(diff < 1);
     }
 
-    /* 2. Note register clamping across all 3 Party slots */
+    /* 2. Strictly monotonic 27-key mapping & register ordering across all 3 Party slots */
     for (int d = 0; d < 27; d++) {
         uint8_t n0 = engine_note_for_degree(d, 0);
         uint8_t n1 = engine_note_for_degree(d, 1);
         uint8_t n2 = engine_note_for_degree(d, 2);
-        assert(n0 >= 48 && n0 <= 72);
-        assert(n1 >= 57 && n1 <= 84);
-        assert(n2 >= 62 && n2 <= 91);
+        assert(n0 >= 48 && n0 <= 108);
+        assert(n1 >= n0 && n2 >= n1);
+        if (d > 0) {
+            assert(n0 > engine_note_for_degree(d - 1, 0));
+            assert(n1 > engine_note_for_degree(d - 1, 1));
+            assert(n2 > engine_note_for_degree(d - 1, 2));
+        }
     }
 
     /* 3. Silence-triggered 1..16 note Seed planting (>= 28 ticks AND >= 850 ms) */
