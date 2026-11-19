@@ -1,3 +1,9 @@
 build/
-__pycache__/
+*.o
+*.elf
+*.bin
+*.fwsc
+*.wav
+*.ppm
 .DS_Store
+__pycache__/
