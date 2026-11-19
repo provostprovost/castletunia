@@ -72,9 +72,9 @@ uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
     int32_t midi = 36 + (int32_t)(g_state.settings.root_semitone % 12u)
                  + oct * 12 + (int32_t)z->scale_semitones[d];
 
-    /* Party Register Clamping: Slot 0 (36..55), Slot 1 (55..72), Slot 2 (67..88) */
-    int32_t lo = 36, hi = 55;
-    if (slot == 1u) { lo = 55; hi = 72; }
+    /* Party Register Clamping: Slot 0 (48..67), Slot 1 (60..79), Slot 2 (67..88) */
+    int32_t lo = 48, hi = 67;
+    if (slot == 1u) { lo = 60; hi = 79; }
     else if (slot >= 2u) { lo = 67; hi = 88; }
 
     while (midi < lo) midi += 12;
@@ -392,7 +392,28 @@ void seed_commit_capture(void)
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
     g_state.attack_timer[s] = 15u;
+    uint8_t was_paused = !g_state.playing;
     g_state.playing = 1u;
+    if (was_paused) {
+        g_state.tick_in_16th = 0u;
+        g_state.step_16th = 0u;
+        g_state.bar_count = 0u;
+    }
+    /* Immediately play first note of the entered tune and launch count flying notes at Boss */
+    if (ns.note_count > 0u && ns.scale_deg[0] >= 0) {
+        uint8_t m0 = engine_note_for_degree(ns.scale_deg[0], s);
+        dsp_note_on(s, m0, 32767u, 12u);
+    }
+    for (uint8_t i = 0; i < count && i < MAX_SEED_NOTES; i++) {
+        int16_t y0 = (int16_t)(38 + (int)s * 44);
+        g_state.note_fx[i].x = 172;
+        g_state.note_fx[i].y = y0;
+        g_state.note_fx[i].vx = -7;
+        g_state.note_fx[i].vy = (int16_t)((72 - y0) / 15);
+        g_state.note_fx[i].slot = s;
+        g_state.note_fx[i].delay = (uint8_t)(i * 3u);
+        g_state.note_fx[i].active = 1u;
+    }
     g_state.boss_hit_timer = 12u;
     dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
@@ -475,7 +496,6 @@ void engine_on_key_up(uint8_t key_idx)
 
 void engine_spell_haste_toggle(void)
 {
-    g_state.playing = 1u;
     g_state.spells.haste_active ^= 1u;
     g_state.dirty_party = 1u;
     engine_set_ticker(g_state.spells.haste_active ? "> CAST HASTE!" : "> HASTE FADED");
@@ -483,7 +503,6 @@ void engine_spell_haste_toggle(void)
 
 void engine_spell_mirror_toggle(void)
 {
-    g_state.playing = 1u;
     g_state.spells.mirror_active ^= 1u;
     g_state.dirty_diorama = 1u;
     engine_set_ticker(g_state.spells.mirror_active ? "> CAST MIRROR!" : "> MIRROR FADED");
@@ -491,7 +510,6 @@ void engine_spell_mirror_toggle(void)
 
 void engine_spell_shatter(void)
 {
-    g_state.playing = 1u;
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         if (!g_state.slots[s].frozen && g_state.slots[s].note_count > 0u) {
             if ((engine_prng() % 100u) < 75u) {
@@ -512,7 +530,6 @@ void engine_spell_shatter(void)
 
 void engine_spell_resolve(void)
 {
-    g_state.playing = 1u;
     g_state.spells.resolve_armed = 1u;
     g_state.gold_flash_timer = 10u;
     engine_set_ticker("> CAST RESOLVE!");
@@ -520,7 +537,6 @@ void engine_spell_resolve(void)
 
 void engine_spell_conjure(void)
 {
-    g_state.playing = 1u;
     uint8_t s = g_state.next_slot;
     if (g_state.slots[s].frozen) s = find_next_unfrozen_slot(s);
     if (g_state.slots[s].frozen) {
@@ -567,7 +583,28 @@ void engine_spell_conjure(void)
     g_state.slot_pending[s] = 1u;
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
     g_state.attack_timer[s] = 15u;
+    uint8_t was_paused = !g_state.playing;
     g_state.playing = 1u;
+    if (was_paused) {
+        g_state.tick_in_16th = 0u;
+        g_state.step_16th = 0u;
+        g_state.bar_count = 0u;
+    }
+    /* Immediately play first note of the entered tune and launch count flying notes at Boss */
+    if (ns.note_count > 0u && ns.scale_deg[0] >= 0) {
+        uint8_t m0 = engine_note_for_degree(ns.scale_deg[0], s);
+        dsp_note_on(s, m0, 32767u, 12u);
+    }
+    for (uint8_t i = 0; i < count && i < MAX_SEED_NOTES; i++) {
+        int16_t y0 = (int16_t)(38 + (int)s * 44);
+        g_state.note_fx[i].x = 172;
+        g_state.note_fx[i].y = y0;
+        g_state.note_fx[i].vx = -7;
+        g_state.note_fx[i].vy = (int16_t)((72 - y0) / 15);
+        g_state.note_fx[i].slot = s;
+        g_state.note_fx[i].delay = (uint8_t)(i * 3u);
+        g_state.note_fx[i].active = 1u;
+    }
     g_state.boss_hit_timer = 12u;
     dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
@@ -764,23 +801,25 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     int32_t c_root = (int32_t)g_state.active_chord_deg;
 
     if (s == 0u) {
-        /* Fighter (Bass): Anchors root on beat 1, guided root/5th/walking movement on beats 2..4 */
-        if (step == 0u) {
-            deg = c_root;
-        } else if (g_state.settings.harmony >= 15u) {
-            static const int8_t BASS_WALK[4] = {0, 4, 2, 6};
-            uint8_t w_idx = (uint8_t)(((step >> 2) + form_bar) & 3u);
-            deg = c_root + BASS_WALK[w_idx];
+        /* Fighter (Bass): Only synthesize walking bass for 1-note seeds; multi-note phrases keep user melody */
+        if (sl->note_count == 1u) {
+            if (step == 0u) {
+                deg = c_root;
+            } else if (g_state.settings.harmony >= 15u) {
+                static const int8_t BASS_WALK[4] = {0, 4, 2, 6};
+                uint8_t w_idx = (uint8_t)(((step >> 2) + form_bar) & 3u);
+                deg = c_root + BASS_WALK[w_idx];
+            }
         }
     } else if (s == 1u) {
-        /* Cleric (Arpeggio): 4 rotating RPG arpeggio shapes across bars so it stays fresh */
+        /* Cleric (Arpeggio): Rotate RPG arpeggios for 1-note seeds; multi-note phrases keep user melody */
         static const int8_t ARP_SHAPES[4][4] = {
             {0, 2, 4, 7}, /* Bar 0: Rising Prelude */
             {7, 4, 2, 0}, /* Bar 1: Falling Cascade */
             {0, 4, 2, 4}, /* Bar 2: Alberti Wave */
             {0, 2, 4, 6}  /* Bar 3: Seventh Turnaround */
         };
-        if (g_state.settings.harmony >= 25u) {
+        if (sl->note_count == 1u && g_state.settings.harmony >= 25u) {
             uint8_t shape = (uint8_t)((form_bar + (g_state.settings.drift > 50u ? (engine_prng() & 1u) : 0u)) & 3u);
             deg = c_root + ARP_SHAPES[shape][(step >> 1) & 3u];
         }
@@ -853,7 +892,7 @@ void engine_tick_ppqn(void)
             if (denom > 0u) {
                 g_state.silence_ms += (60000u / denom);
             }
-            if (g_state.silence_ticks >= 54u && g_state.silence_ms >= 1500u) {
+            if (g_state.silence_ticks >= 28u && g_state.silence_ms >= 850u) {
                 seed_commit_capture();
             }
         }

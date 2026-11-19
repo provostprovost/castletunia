@@ -110,6 +110,16 @@ typedef struct {
 } ZoneDef;
 
 typedef struct {
+    int16_t x;
+    int16_t y;
+    int16_t vx;
+    int16_t vy;
+    uint8_t slot;
+    uint8_t delay;
+    uint8_t active;
+} NoteProjectile;
+
+typedef struct {
     SeedSlot          slots[NUM_PARTY_SLOTS];
     SeedSlot          staging_slots[NUM_PARTY_SLOTS];
     volatile uint8_t  slot_pending[NUM_PARTY_SLOTS];
@@ -153,6 +163,7 @@ typedef struct {
     uint8_t           boss_hit_timer;
     uint8_t           boss_atk_timer;
     uint8_t           boss_curse_bars;
+    NoteProjectile    note_fx[MAX_SEED_NOTES];
 } FantasiaState;
 
 #endif /* FANTASIA_TYPES_H */

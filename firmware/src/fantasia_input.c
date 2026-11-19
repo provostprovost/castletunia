@@ -127,9 +127,9 @@ void input_process(void)
         }
     }
 
-    /* BTN_HOME: Instant CONJURE auto-attack on press */
+    /* BTN_HOME: Skip to next Party member without starting playback */
     if (press & (1u << BTN_HOME)) {
-        engine_spell_conjure();
+        engine_advance_next_slot();
     }
 
     /* BTN_REC: Cancel capture, Tap clear next_slot, Hold 600ms clear all unfrozen */

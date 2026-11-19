@@ -431,6 +431,62 @@ void ui_init(void)
     g_state.dirty_ticker = 1u;
 }
 
+static uint8_t any_note_fx_active(void)
+{
+    for (uint8_t i = 0; i < MAX_SEED_NOTES; i++) {
+        if (g_state.note_fx[i].active) return 1u;
+    }
+    return 0u;
+}
+
+static void render_note_projectiles(void)
+{
+    static const uint8_t NOTE_GLYPH[7] = {
+        0x1Cu, /* ..###.. */
+        0x14u, /* ..#.#.. */
+        0x12u, /* ..#..#. */
+        0x10u, /* ..#.... */
+        0x70u, /* .###... */
+        0x70u, /* .###... */
+        0x20u  /* ..#.... */
+    };
+    static const uint16_t SLOT_COLS[3] = { 0xFE60u, 0x07FFu, 0xF81Fu };
+    uint8_t z = g_state.settings.zone_id % 9u;
+    uint8_t mirror = g_state.spells.mirror_active;
+
+    for (uint8_t i = 0; i < MAX_SEED_NOTES; i++) {
+        NoteProjectile *np = &g_state.note_fx[i];
+        if (!np->active) continue;
+        if (np->delay > 0u) {
+            np->delay--;
+            continue;
+        }
+        int px = (int)np->x;
+        int py = (int)np->y;
+        uint16_t col = SLOT_COLS[np->slot % 3u];
+        for (int r = 0; r < 7; r++) {
+            int yy = py + r;
+            for (int c = 0; c < 7; c++) {
+                int xx = px + c;
+                uint16_t bg = (xx >= 0 && xx < 240 && yy >= 0 && yy < 160)
+                            ? apply_boss_atk_fx(sample_diorama_px(z, xx >> 1, yy >> 1, mirror), z)
+                            : 0u;
+                if ((NOTE_GLYPH[r] >> (6 - c)) & 1u) bg = col;
+                g_sprite_buf[r * 7 + c] = bg;
+            }
+        }
+        if (px >= 0 && px <= 233 && py >= 0 && py <= 153) {
+            hal_lcd_blit_rect(px, py, 7, 7, g_sprite_buf);
+        }
+        np->x += np->vx;
+        np->y += np->vy;
+        if (np->x <= 72) {
+            np->active = 0u;
+            g_state.boss_hit_timer = 5u;
+        }
+    }
+}
+
 void ui_render(void)
 {
     if (!g_hud_frame_drawn || g_state.spells.haste_active != g_last_haste) {
@@ -442,11 +498,16 @@ void ui_render(void)
         g_state.dirty_ticker = 1u;
     }
 
+    uint8_t nfx = any_note_fx_active();
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u ||
-        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u) {
+        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u || nfx) {
         render_diorama_full();
-        if (g_state.slide_frames == 0u) render_battle_sprites();
+        if (g_state.slide_frames == 0u) {
+            render_battle_sprites();
+            if (nfx) render_note_projectiles();
+        }
         g_state.dirty_diorama = 0u;
+        if (nfx && !any_note_fx_active()) g_state.dirty_diorama = 1u;
         if (g_state.slide_frames > 0u) g_state.slide_frames--;
         if (g_state.shake_timer > 0u) g_state.shake_timer--;
         if (g_state.toll_ring_timer > 0u) g_state.toll_ring_timer--;

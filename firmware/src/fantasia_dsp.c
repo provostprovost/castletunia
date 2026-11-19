@@ -422,10 +422,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix: Party leads forward, Backing Chords/Perc & other slots ducked while playing keys */
+    /* Stereo mix: Fighter & Cleric boosted 1.5x so all 3 Party voices cut through clearly */
     int32_t p_mix = (pl >> 1) + ((ph * 3) >> 3);
     int32_t bg_mix = ((drone * 3) >> 2) + p_mix;
-    int32_t pv[3] = { v0 + (v0 >> 2), v1 + (v1 >> 2), v2 };
+    int32_t pv[3] = { v0 + (v0 >> 1), v1 + (v1 >> 1), v2 };
     if (g_state.capture.active || g_state.held_keys_mask != 0u) {
         bg_mix >>= 2;
         uint8_t act = g_state.next_slot % 3u;
