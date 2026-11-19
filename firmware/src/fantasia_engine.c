@@ -328,7 +328,7 @@ void engine_on_key_down(uint8_t key_idx)
     /* Live Jam Bypass if all 3 Party slots are frozen */
     if (slot_is_all_frozen()) {
         uint8_t midi = engine_note_for_degree((int32_t)key_idx, 2u);
-        dsp_note_on(2u, midi, 26000u, 8u);
+        dsp_note_on(2u, midi, 32767u, 16u);
         return;
     }
 
@@ -338,7 +338,7 @@ void engine_on_key_down(uint8_t key_idx)
     }
 
     uint8_t midi = engine_note_for_degree((int32_t)key_idx, target_slot);
-    dsp_note_on(target_slot, midi, 26000u, 8u);
+    dsp_note_on(target_slot, midi, 32767u, 16u);
 
     if (!g_state.capture.active) {
         g_state.capture.active = 1u;

@@ -129,7 +129,7 @@ void dsp_drone_set(uint8_t root_midi, uint8_t fifth_midi, uint8_t fifth_enable, 
     uint32_t f_inc = G_MIDI_PHASE_INC[fifth_midi];
     g_drone_inc2 = f_inc + (f_inc / 667u); /* +0.15% detuned 5th */
     g_drone_fifth_en = fifth_enable;
-    g_drone_level_q15 = (int32_t)level * 160;
+    g_drone_level_q15 = (int32_t)level * 72; /* Supportive ambient bed under Party leads */
 }
 
 static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -386,9 +386,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix */
-    int32_t dry_l = drone + (v0 >> 1) + ((v1 * 3) >> 3) + ((v2 * 3) >> 3) + (vt >> 1) + (pl >> 1) + ((ph * 3) >> 3);
-    int32_t dry_r = drone + (v0 >> 1) + ((v1 * 5) >> 4) + ((v2 * 5) >> 4) + (vt >> 1) + (pl >> 1) + ((ph * 5) >> 4);
+    /* Stereo mix: Party leads forward, Drone & Percussion supportive */
+    int32_t p_mix = (pl >> 2) + (ph >> 2);
+    int32_t dry_l = (drone >> 1) + ((v0 * 3) >> 2) + v1 + v2 + (v2 >> 2) + (vt >> 1) + p_mix;
+    int32_t dry_r = (drone >> 1) + ((v0 * 3) >> 2) + v1 + v2 + (v2 >> 2) + (vt >> 1) + p_mix;
 
     /* 4. Schroeder 4-Comb + 2-Allpass Room Reverb */
     int32_t rev_in = (dry_l + dry_r) >> 2;
