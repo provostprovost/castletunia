@@ -5,7 +5,9 @@
 #include "app_config.h"
 
 #define APP_NAME    "FANTASIA"
+#ifndef FELUCCA_ID
 #define FELUCCA_ID  "FM-1_961"
+#endif
 #define STORE_MAGIC FANTASIA_STORE_MAGIC
 
 static void app_idle(void);

@@ -128,7 +128,7 @@ void dsp_drone_set(uint8_t root_midi, uint8_t fifth_midi, uint8_t fifth_enable, 
     uint32_t f_inc = G_MIDI_PHASE_INC[fifth_midi];
     g_drone_inc2 = f_inc + (f_inc / 667u); /* +0.15% detuned 5th */
     g_drone_fifth_en = fifth_enable;
-    g_drone_level_q15 = (int32_t)level * 64; /* ~25% max headroom */
+    g_drone_level_q15 = (int32_t)level * 160;
 }
 
 static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -340,7 +340,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
 {
     const ZoneDef *z = zone_get(g_state.settings.zone_id);
 
-    /* 1. Living Room Ambient Drone (active immediately on boot) */
+    /* 1. Living Room Ambient Drone (active immediately on boot; octave-enriched for 28mm speaker) */
     g_drone_ph1 += g_drone_inc1;
     g_drone_ph2 += g_drone_inc2;
     g_drone_lfo_ph += 17530u; /* ~0.18 Hz at 44.1 kHz */
@@ -348,10 +348,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     if (lfo_tri < 0) lfo_tri = -lfo_tri;
     int32_t lfo_gain = 22938 + ((lfo_tri * 9829) >> 15); /* 70%..100% Q15 */
 
-    int32_t d1 = hal_sine_q15(g_drone_ph1);
+    int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 1)) >> 1;
     int32_t d2 = g_drone_fifth_en ? (hal_sine_q15(g_drone_ph2) >> 1) : 0;
     int32_t drone_raw = q15_mul((d1 + d2) >> 1, lfo_gain);
-    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 3500);
+    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5500);
     int32_t drone = q15_mul(g_drone_lpf, g_drone_level_q15);
 
     /* 2. Three-Member Party FM Engine + Toll Voice */
@@ -386,10 +386,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t mix_l = dry_l + q15_mul(ap_l, (int32_t)rev_mix);
     int32_t mix_r = dry_r + q15_mul(ap_r, (int32_t)rev_mix);
 
-    /* 5. ~120 Hz DC/HPF (Q8 sub-LSB precision so it decays cleanly to 0) + Q15 Soft-Clipper */
-    g_hp_l += ((mix_l << 8) - g_hp_l) / 58;
+    /* 5. ~45 Hz DC/HPF (Q8 sub-LSB precision so it decays cleanly to 0) + Q15 Soft-Clipper */
+    g_hp_l += ((mix_l << 8) - g_hp_l) / 156;
     mix_l -= (g_hp_l >> 8);
-    g_hp_r += ((mix_r << 8) - g_hp_r) / 58;
+    g_hp_r += ((mix_r << 8) - g_hp_r) / 156;
     mix_r -= (g_hp_r >> 8);
 
     *out_l = soft_clip_q15(mix_l);

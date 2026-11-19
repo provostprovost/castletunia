@@ -194,6 +194,7 @@ static inline void hal_lcd_blit_rect(int x, int y, int w, int h, const uint16_t 
         int chunk = h - row;
         if (chunk > 8) chunk = 8;
         int n = w * chunk;
+        lcd_sync();
         for (int i = 0; i < n; i++) {
             uint16_t c = buf[row * w + i];
             g_hal_swap_buf[i] = (uint16_t)((c >> 8) | (c << 8));
