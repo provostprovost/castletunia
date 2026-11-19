@@ -547,6 +547,40 @@ def make_sprite_palette():
     ]
 
 
+def load_boss_sprite(zone_id):
+    from collections import deque
+    p = ASSETS / "bosses" / f"boss_{zone_id}.png"
+    im = Image.open(p).convert("RGB").resize((32, 32), Image.NEAREST)
+    px = im.load()
+    vis = [[False] * 32 for _ in range(32)]
+    q = deque([(x, 0) for x in range(32)] + [(x, 31) for x in range(32)] +
+              [(0, y) for y in range(32)] + [(31, y) for y in range(32)])
+    bg = [[False] * 32 for _ in range(32)]
+    while q:
+        x, y = q.popleft()
+        if x < 0 or x >= 32 or y < 0 or y >= 32 or vis[y][x]:
+            continue
+        r, g, b = px[x, y]
+        if r < 12 and g < 12 and b < 12:
+            vis[y][x] = True
+            bg[y][x] = True
+            q.extend([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)])
+
+    # Quantize non-bg pixels to 15 colors + index 0 transparent
+    fg_im = Image.new("RGB", (32, 32), (16, 14, 24))
+    fg_px = fg_im.load()
+    for y in range(32):
+        for x in range(32):
+            if not bg[y][x]:
+                fg_px[x, y] = px[x, y]
+    q_im = fg_im.quantize(colors=15, method=Image.MEDIANCUT, dither=0)
+    raw_pal = q_im.getpalette()[:45]
+    pal = [(0, 0, 0)] + [(raw_pal[i * 3], raw_pal[i * 3 + 1], raw_pal[i * 3 + 2]) for i in range(15)]
+    q_px = list(q_im.getdata())
+    grid = [[0 if bg[y][x] else (q_px[y * 32 + x] + 1) for x in range(32)] for y in range(32)]
+    return grid, [rgb_to_565(*c) for c in pal]
+
+
 def load_or_gen_party_sprites(sp_pal):
     from collections import deque
     out = {}
@@ -711,6 +745,11 @@ def main():
     ]
     sprites = gen_party_sprites()
     party_32 = load_or_gen_party_sprites(sp_pal)
+    boss_grids, boss_pals = [], []
+    for z in range(9):
+        bg_grid, bg_pal = load_boss_sprite(z)
+        boss_grids.append(pack_nibbles(bg_grid))
+        boss_pals.append(bg_pal)
 
     lines = [
         "/* SPDX-License-Identifier: GPL-3.0-only */",
@@ -727,6 +766,8 @@ def main():
         "    uint16_t freeze_pal[16];",
         "    uint8_t  party_sprites[3][512];",
         "    uint8_t  cursor_sprite[128];",
+        "    uint16_t boss_pals[9][16];",
+        "    uint8_t  boss_sprites[9][512];",
         "} FantasiaAssets;",
         "",
         "static const FantasiaAssets fantasia_assets = {",
@@ -754,7 +795,21 @@ def main():
         lines.append(f"        {{ {chunk} }},")
     lines.append("    },")
     cdata = pack_nibbles(sprites["cursor"])
-    lines.append("    .cursor_sprite = { " + ", ".join(f"0x{b:02X}u" for b in cdata) + " }")
+    lines.append("    .cursor_sprite = { " + ", ".join(f"0x{b:02X}u" for b in cdata) + " },")
+    lines.append("    .boss_pals = {")
+    for z in range(9):
+        vals = ", ".join(f"0x{c:04X}u" for c in boss_pals[z])
+        lines.append(f"        {{ {vals} }},")
+    lines.append("    },")
+    lines.append("    .boss_sprites = {")
+    for z in range(9):
+        lines.append("        {")
+        data = boss_grids[z]
+        for off in range(0, len(data), 24):
+            chunk = ", ".join(f"0x{b:02X}u" for b in data[off:off + 24])
+            lines.append(f"            {chunk},")
+        lines.append("        },")
+    lines.append("    }")
     lines.append("};")
     lines.append("")
     lines.append("#define G_FREEZE_PALETTE (fantasia_assets.freeze_pal)")

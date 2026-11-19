@@ -25,6 +25,47 @@ static uint16_t g_patch_buf[4 * 4];         /* 32 B */
 static AmbientParticle g_particles[NUM_PARTICLES];
 static uint8_t g_hud_frame_drawn = 0;
 static uint8_t g_last_haste = 0;
+static uint8_t g_boss_phase = 0;
+
+static uint16_t sample_diorama_px(uint8_t zone_id, int sx, int sy, uint8_t mirror);
+
+static int boss_hover_dy(uint8_t phase)
+{
+    static const int8_t BOB[16] = {-3, -3, -2, -1, 0, 1, 2, 3, 3, 3, 2, 1, 0, -1, -2, -3};
+    return (int)BOB[(phase >> 1) & 15u];
+}
+
+static void render_boss_overlay(void)
+{
+    uint8_t z = g_state.settings.zone_id % 9u;
+    uint8_t mirror = g_state.spells.mirror_active;
+    int bx = 88;
+    int by_base = 44;
+    int dy_bob = boss_hover_dy(g_boss_phase);
+    int by = by_base + dy_bob;
+
+    /* Render 64x72 box (covers bob range -3..+3) in 8-row strips into g_sprite_buf (64*8 = 512 uint16_t) */
+    for (int strip = 0; strip < 72; strip += 8) {
+        for (int r = 0; r < 8; r++) {
+            int sy_scr = (by_base - 4) + strip + r;
+            for (int c = 0; c < 64; c++) {
+                int sx_scr = bx + c;
+                uint16_t bg = sample_diorama_px(z, sx_scr >> 1, sy_scr >> 1, mirror);
+                int b_y = sy_scr - by;
+                if (b_y >= 0 && b_y < 64) {
+                    int b_sx = mirror ? (31 - (c >> 1)) : (c >> 1);
+                    int b_sy = b_y >> 1;
+                    uint32_t idx = (uint32_t)b_sy * 32u + (uint32_t)b_sx;
+                    uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
+                    uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
+                    if (ci != 0u) bg = fantasia_assets.boss_pals[z][ci];
+                }
+                g_sprite_buf[r * 64 + c] = bg;
+            }
+        }
+        hal_lcd_blit_rect(bx, (by_base - 4) + strip, 64, 8, g_sprite_buf);
+    }
+}
 
 static uint16_t hud_bg_color(int y)
 {
@@ -268,12 +309,15 @@ void ui_render(void)
 
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u || g_state.toll_ring_timer > 0u) {
         render_diorama_full();
+        if (g_state.slide_frames == 0u) render_boss_overlay();
         g_state.dirty_diorama = 0u;
         if (g_state.slide_frames > 0u) g_state.slide_frames--;
         if (g_state.shake_timer > 0u) g_state.shake_timer--;
         if (g_state.toll_ring_timer > 0u) g_state.toll_ring_timer--;
     } else {
         render_particles();
+        g_boss_phase++;
+        render_boss_overlay();
     }
 
     if (g_state.gold_flash_timer > 0u) {
