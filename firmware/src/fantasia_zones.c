@@ -52,7 +52,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
     {
         .name = "THE TUNDRA",
         .subgenre_id = 6,
-        .default_bpm = 76,
+        .default_bpm = 60,
         .scale_semitones = {0, 2, 3, 5, 7, 8, 10},
         .mid_prog = {0, 4, 5, 2},
         .high_prog = {0, 4, 5, 6},
@@ -98,7 +98,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
     {
         .name = "THE GLADE",
         .subgenre_id = 2,
-        .default_bpm = 96,
+        .default_bpm = 82,
         .scale_semitones = {0, 2, 3, 5, 7, 9, 10},
         .mid_prog = {0, 3, 6, 0},
         .high_prog = {0, 3, 5, 6},
@@ -121,7 +121,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
     {
         .name = "THE CASTLE",
         .subgenre_id = 3,
-        .default_bpm = 108,
+        .default_bpm = 90,
         .scale_semitones = {0, 2, 3, 5, 7, 8, 11},
         .mid_prog = {0, 5, 3, 4},
         .high_prog = {0, 5, 1, 4},
@@ -144,16 +144,16 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
     {
         .name = "CORONATION",
         .subgenre_id = 7,
-        .default_bpm = 116,
+        .default_bpm = 104,
         .scale_semitones = {0, 2, 4, 5, 7, 9, 11},
         .mid_prog = {0, 4, 5, 3},
-        .high_prog = {0, 4, 5, 1},
+        .high_prog = {0, 4, 5, 3},
         .reverb_mix = 64,
         .reverb_fb = 23500,
         .party_patches = {
-            {1, 1, 30000, 16000, 140, 32650, 25000, 31800}, /* Coronation Fighter: royal trumpet */
-            {2, 1, 26000, 12000, 180, 32640, 23000, 31900}, /* Coronation Cleric: french horn brass */
-            {1, 1, 24000, 10000, 220, 32660, 24000, 32000}  /* Coronation Sorceress: brass fanfare lead */
+            {1, 1, 24000,  6000, 140, 32650, 24000, 31800}, /* Coronation Fighter: clean royal trumpet */
+            {2, 1, 20000,  4000, 180, 32640, 22000, 31900}, /* Coronation Cleric: clean french horn brass */
+            {1, 1, 18000,  3500, 220, 32660, 23000, 32000}  /* Coronation Sorceress: clean brass fanfare lead */
         },
         .perc_low  = { 880,  220, 32100,   900, 1,  5000, 32755},
         .perc_high = {2800, 1400, 29000, 25000, 3, 15000, 32738},
@@ -167,7 +167,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
     {
         .name = "THE SPIRE",
         .subgenre_id = 5,
-        .default_bpm = 86,
+        .default_bpm = 68,
         .scale_semitones = {0, 2, 4, 6, 7, 9, 11},
         .mid_prog = {0, 1, 5, 0},
         .high_prog = {0, 1, 4, 5},

@@ -410,19 +410,9 @@ void seed_commit_capture(void)
     };
     engine_set_ticker(ATK_MSG[s]);
 
-    /* Trigger Boss Counter-Attack once all 3 Party members have finished their turn */
+    /* Arm Boss Counter-Attack 2-beat drum buildup once all 3 Party members have finished their turn */
     if (s == 2u && g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u) {
-        g_state.boss_curse_bars = 1u;
-        g_state.boss_atk_timer = 24u;
-        g_state.shake_timer = 10u;
-        g_state.shake_amp = 2u;
-        dsp_boss_attack_sfx(g_state.settings.zone_id);
-        static const char *const BOSS_ATK_MSG[9] = {
-            "> LICH: DOOM!", "> MIMIC: BRAWL!", "> TREANT: OVERGROW!",
-            "> VAMPIRE: BLOOD MOON!", "> DJINN: SANDSTORM!", "> BEHOLDER: WARP!",
-            "> WYRM: BLIZZARD!", "> SERAPH: JUDGMENT!", "> DEMON: METEOR!"
-        };
-        engine_set_ticker(BOSS_ATK_MSG[zone_get(g_state.settings.zone_id)->subgenre_id % 9u]);
+        g_state.boss_buildup_steps = 8u;
     }
 }
 
@@ -1008,6 +998,35 @@ void engine_tick_ppqn(void)
                 g_state.shake_amp = 1u;
             }
         }
+
+        /* Boss Counter-Attack 2-beat drum roll buildup -> beat-timed chord sting & lunge */
+        if (g_state.boss_buildup_steps > 0u) {
+            uint16_t bvel = (uint16_t)(16000u + (uint32_t)(8u - g_state.boss_buildup_steps) * 2000u);
+            dsp_perc_trigger(1u, bvel);
+            if ((step & 1u) == 0u) dsp_perc_trigger(0u, bvel);
+            g_state.boss_buildup_steps--;
+            if (g_state.boss_buildup_steps == 0u) {
+                g_state.boss_curse_bars = 1u;
+                g_state.boss_atk_timer = 24u;
+                g_state.shake_timer = 10u;
+                g_state.shake_amp = 2u;
+                g_state.active_chord_deg = (z->subgenre_id == 7u) ? 4u : 1u;
+                update_drone_pitch();
+                dsp_boss_attack_sfx(g_state.settings.zone_id);
+                dsp_perc_trigger(0u, 32767u);
+                dsp_perc_trigger(1u, 32767u);
+                static const char *const BOSS_ATK_MSG[9] = {
+                    "> LICH: DOOM!", "> MIMIC: BRAWL!", "> TREANT: OVERGROW!",
+                    "> VAMPIRE: BLOOD MOON!", "> DJINN: SANDSTORM!", "> BEHOLDER: WARP!",
+                    "> WYRM: BLIZZARD!", "> SERAPH: JUDGMENT!", "> DEMON: METEOR!"
+                };
+                engine_set_ticker(BOSS_ATK_MSG[z->subgenre_id % 9u]);
+            }
+        }
+    }
+
+    if (g_state.boss_buildup_steps > 0u && g_state.boss_buildup_steps <= 2u && t == 3u) {
+        dsp_perc_trigger(1u, 30000u); /* Rapid snare roll into Boss chord sting */
     }
 
     if (eff_haste && fire_haste) {

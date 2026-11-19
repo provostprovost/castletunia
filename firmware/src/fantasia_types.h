@@ -163,6 +163,7 @@ typedef struct {
     uint8_t           boss_hit_timer;
     uint8_t           boss_atk_timer;
     uint8_t           boss_curse_bars;
+    uint8_t           boss_buildup_steps;
     NoteProjectile    note_fx[MAX_SEED_NOTES];
 } FantasiaState;
 
