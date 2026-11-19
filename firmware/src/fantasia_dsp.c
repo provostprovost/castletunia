@@ -51,6 +51,7 @@ typedef struct {
     uint16_t gate_ticks;
     uint8_t  stage;
     uint8_t  quick_rel;
+    uint8_t  env_div;
 } FmVoice;
 
 typedef struct {
@@ -146,6 +147,7 @@ static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint
     v->target_env = 32767;
     v->stage = ENV_ATK;
     v->quick_rel = 0u;
+    v->env_div = 0u;
 }
 
 void dsp_note_on(uint8_t slot, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -233,22 +235,26 @@ static int32_t render_fm_voice(FmVoice *v, const FmPatch *patch, int32_t grit_bo
             }
             break;
         case ENV_DEC:
-            v->env_q15 = q15_mul(v->env_q15, patch->decay_q15);
-            if (v->env_q15 <= (int32_t)patch->sustain_q15) {
-                v->env_q15 = (int32_t)patch->sustain_q15;
-                v->stage = (v->env_q15 < 8) ? ENV_OFF : ENV_SUS;
+            if ((++v->env_div & 31u) == 0u) {
+                v->env_q15 = q15_mul(v->env_q15, patch->decay_q15);
+                if (v->env_q15 <= (int32_t)patch->sustain_q15) {
+                    v->env_q15 = (int32_t)patch->sustain_q15;
+                    v->stage = (v->env_q15 < 8) ? ENV_OFF : ENV_SUS;
+                }
             }
             break;
         case ENV_SUS:
             break;
         case ENV_REL:
         default: {
-            uint16_t rel = v->quick_rel ? 29500u : patch->release_q15;
-            v->env_q15 = q15_mul(v->env_q15, rel);
-            if (v->env_q15 < 8) {
-                v->env_q15 = 0;
-                v->stage = ENV_OFF;
-                return 0;
+            if ((++v->env_div & 31u) == 0u) {
+                uint16_t rel = v->quick_rel ? 29500u : patch->release_q15;
+                v->env_q15 = q15_mul(v->env_q15, rel);
+                if (v->env_q15 < 8) {
+                    v->env_q15 = 0;
+                    v->stage = ENV_OFF;
+                    return 0;
+                }
             }
             break;
         }
@@ -258,14 +264,14 @@ static int32_t render_fm_voice(FmVoice *v, const FmPatch *patch, int32_t grit_bo
     v->phase_m += v->inc_m;
 
     int32_t fb = (v->prev_mod * (int32_t)patch->feedback_q15) >> 15;
-    int16_t mod = hal_sine_q15(v->phase_m + ((uint32_t)fb << 16));
+    int16_t mod = hal_sine_q15(v->phase_m + ((uint32_t)fb << 15));
     v->prev_mod = mod;
 
     int32_t env2 = (v->env_q15 * v->env_q15) >> 15;
     int32_t mod_idx = (int32_t)patch->mod_index_q15 + grit_boost_q15;
     if (mod_idx > 65535) mod_idx = 65535;
     int32_t idx = (mod_idx * env2) >> 15;
-    int16_t car = hal_sine_q15(v->phase_c + (uint32_t)(mod * idx));
+    int16_t car = hal_sine_q15(v->phase_c + (uint32_t)((mod * idx) >> 1));
 
     int32_t out = q15_mul(car, v->env_q15);
     return q15_mul(out, v->vel_q15);
@@ -344,7 +350,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     g_drone_ph1 += g_drone_inc1;
     g_drone_ph2 += g_drone_inc2;
     g_drone_lfo_ph += 17530u; /* ~0.18 Hz at 44.1 kHz */
-    int32_t lfo_tri = (int32_t)(g_drone_lfo_ph >> 16);
+    int32_t lfo_tri = (int16_t)(g_drone_lfo_ph >> 16);
     if (lfo_tri < 0) lfo_tri = -lfo_tri;
     int32_t lfo_gain = 22938 + ((lfo_tri * 9829) >> 15); /* 70%..100% Q15 */
 
