@@ -51,7 +51,7 @@ static uint8_t find_next_unfrozen_slot(uint8_t start)
 void engine_set_ticker(const char *msg)
 {
     copy_str(g_state.ticker, msg, sizeof(g_state.ticker));
-    g_state.ticker_timer = 90u;
+    g_state.ticker_timer = 36u;
     g_state.dirty_ticker = 1u;
 }
 
