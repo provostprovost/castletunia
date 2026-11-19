@@ -573,11 +573,38 @@ def load_boss_sprite(zone_id):
 
 def load_party_sprites():
     grids, pals = {}, {}
+    atk_grids, atk_pals = {}, {}
     for name in ("fighter", "wmage", "sorceress"):
         g, p = quantize_rgba(ASSETS / "sprites" / f"{name}.png", 42)
         grids[name] = g
         pals[name] = p
-    return grids, pals
+
+        # Quantize 3 attack frames against a shared 15-color palette per character
+        strip = Image.new("RGB", (42 * 3, 42), (16, 14, 24))
+        masks = []
+        for f in range(3):
+            im = Image.open(ASSETS / "sprites" / f"{name}_atk_{f}.png").convert("RGBA").resize((42, 42), Image.NEAREST)
+            px = im.load()
+            m = [[False] * 42 for _ in range(42)]
+            for y in range(42):
+                for x in range(42):
+                    r, g0, b, a = px[x, y]
+                    if a >= 96:
+                        m[y][x] = True
+                        strip.putpixel((f * 42 + x, y), (r, g0, b))
+            masks.append(m)
+        q_strip = strip.quantize(colors=15, method=Image.MEDIANCUT, dither=0)
+        raw_pal = q_strip.getpalette()[:45]
+        atk_pals[name] = [rgb_to_565(0, 0, 0)] + [
+            rgb_to_565(raw_pal[i * 3], raw_pal[i * 3 + 1], raw_pal[i * 3 + 2]) for i in range(15)
+        ]
+        q_px = list(q_strip.getdata())
+        atk_grids[name] = []
+        for f in range(3):
+            m = masks[f]
+            fg = [[0 if not m[y][x] else (q_px[y * 126 + f * 42 + x] + 1) for x in range(42)] for y in range(42)]
+            atk_grids[name].append(fg)
+    return grids, pals, atk_grids, atk_pals
 
 
 def gen_party_sprites():
@@ -702,7 +729,7 @@ def main():
         rgb_to_565(255, 255, 255),
     ]
     sprites = gen_party_sprites()
-    party_32, party_pals = load_party_sprites()
+    party_32, party_pals, atk_grids, atk_pals = load_party_sprites()
     boss_grids, boss_pals = [], []
     for z in range(9):
         bg_grid, bg_pal = load_boss_sprite(z)
@@ -724,6 +751,8 @@ def main():
         "    uint16_t freeze_pal[16];",
         "    uint16_t party_pals[3][16];",
         "    uint8_t  party_sprites[3][882];",
+        "    uint16_t party_atk_pals[3][16];",
+        "    uint8_t  party_atk[3][3][882];",
         "    uint8_t  cursor_sprite[128];",
         "    uint16_t boss_pals[9][16];",
         "    uint8_t  boss_sprites[9][4608];",
@@ -757,6 +786,20 @@ def main():
         sdata = pack_nibbles(party_32[name])
         chunk = ", ".join(f"0x{b:02X}u" for b in sdata)
         lines.append(f"        {{ {chunk} }},")
+    lines.append("    },")
+    lines.append("    .party_atk_pals = {")
+    for name in ("fighter", "wmage", "sorceress"):
+        vals = ", ".join(f"0x{c:04X}u" for c in atk_pals[name])
+        lines.append(f"        {{ {vals} }},")
+    lines.append("    },")
+    lines.append("    .party_atk = {")
+    for name in ("fighter", "wmage", "sorceress"):
+        lines.append("        {")
+        for f in range(3):
+            sdata = pack_nibbles(atk_grids[name][f])
+            chunk = ", ".join(f"0x{b:02X}u" for b in sdata)
+            lines.append(f"            {{ {chunk} }},")
+        lines.append("        },")
     lines.append("    },")
     cdata = pack_nibbles(sprites["cursor"])
     lines.append("    .cursor_sprite = { " + ", ".join(f"0x{b:02X}u" for b in cdata) + " },")

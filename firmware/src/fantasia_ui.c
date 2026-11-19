@@ -107,13 +107,18 @@ static void render_battle_sprites(void)
     static const int BASE_X[3] = {174, 182, 190};
     static const int BASE_Y[3] = {24, 68, 112};
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
-        const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.party_pals[s];
+        uint8_t atk_t = g_state.attack_timer[s];
+        const uint16_t *pal = g_state.slots[s].frozen
+                            ? G_FREEZE_PALETTE
+                            : (atk_t > 0u ? fantasia_assets.party_atk_pals[s] : fantasia_assets.party_pals[s]);
+        const uint8_t *spr = fantasia_assets.party_sprites[s];
         int lunge = 0;
-        if (g_state.attack_timer[s] > 0u) {
-            int t = (int)g_state.attack_timer[s];
-            lunge = (t > 6) ? -(12 - t) * 5 : -t * 5; /* Lunge left toward boss & return */
+        if (atk_t > 0u) {
+            uint8_t frame = (atk_t > 10u) ? 0u : ((atk_t > 5u) ? 1u : 2u);
+            spr = fantasia_assets.party_atk[s][frame];
+            lunge = (frame == 0u) ? -10 : ((frame == 1u) ? -28 : -16);
         }
-        int hop = (g_state.slots[s].anim_timer > 0u) ? -2 : 0;
+        int hop = (g_state.slots[s].anim_timer > 0u && atk_t == 0u) ? -2 : 0;
         int lane_x = BASE_X[s] - 32; /* 74px wide lane covers lunge */
         int lane_y = BASE_Y[s] - 2;
         int sx0 = BASE_X[s] + lunge;
@@ -128,7 +133,7 @@ static void render_battle_sprites(void)
                     int sp_y = sy_scr - (BASE_Y[s] + hop);
                     if (sp_x >= 0 && sp_x < 42 && sp_y >= 0 && sp_y < 42) {
                         uint32_t idx = (uint32_t)sp_y * 42u + (uint32_t)sp_x;
-                        uint8_t packed = fantasia_assets.party_sprites[s][idx >> 1];
+                        uint8_t packed = spr[idx >> 1];
                         uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                         if (ci != 0u) bg = pal[ci];
                     }

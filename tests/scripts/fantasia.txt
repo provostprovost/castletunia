@@ -5,6 +5,7 @@
 650 keys 0
 800 keys 128
 950 keys 0
+2100 shot
 2400 shot
 2600 enc 0 3
 3200 btn 8

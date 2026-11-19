@@ -175,6 +175,18 @@ void dsp_toll_trigger(uint8_t zone_id, uint8_t root_midi)
     start_fm_voice(&g_toll, &z->toll_patch, note, 28000u, 36u);
 }
 
+void dsp_attack_sfx(uint8_t slot)
+{
+    static const FmPatch ATK_SFX[3] = {
+        {7, 2, 36000, 10000, 64, 31500, 0, 29000}, /* Fighter: crisp metallic sword slash */
+        {5, 2, 28000,  2000, 64, 32350, 0, 31000}, /* White Mage: bright Holy bell chime */
+        {3, 1, 44000,  8000, 64, 32100, 0, 30000}  /* Red Sorceress: arcane Flare burst */
+    };
+    static const uint8_t NOTES[3] = { 62u, 79u, 74u };
+    uint8_t s = slot % 3u;
+    start_fm_voice(&g_toll, &ATK_SFX[s], NOTES[s], 26000u, 10u);
+}
+
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel_q15)
 {
     uint8_t ch = is_high ? 1u : 0u;

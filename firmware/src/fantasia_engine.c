@@ -290,8 +290,9 @@ void seed_commit_capture(void)
     g_state.capture.count = 0u;
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
-    g_state.attack_timer[s] = 12u;
-    g_state.boss_hit_timer = 10u;
+    g_state.attack_timer[s] = 15u;
+    g_state.boss_hit_timer = 12u;
+    dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
     static const char *const ATK_MSG[3] = {
@@ -434,8 +435,9 @@ void engine_spell_conjure(void)
     g_state.staging_slots[s] = ns;
     g_state.slot_pending[s] = 1u;
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
-    g_state.attack_timer[s] = 12u;
-    g_state.boss_hit_timer = 10u;
+    g_state.attack_timer[s] = 15u;
+    g_state.boss_hit_timer = 12u;
+    dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
     engine_set_ticker("> CONJURED!");

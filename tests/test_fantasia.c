@@ -44,6 +44,7 @@ void dsp_note_on(uint8_t slot, uint8_t midi, uint16_t vel, uint16_t gate) {
 }
 void dsp_voice_quick_release(uint8_t slot) { (void)slot; }
 void dsp_toll_trigger(uint8_t zone_id, uint8_t root) { (void)zone_id; (void)root; spy_toll_count++; }
+void dsp_attack_sfx(uint8_t slot) { (void)slot; }
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel) { (void)is_high; (void)vel; spy_perc_count++; }
 void dsp_all_notes_off(void) {}
 void dsp_tick_gates(void) {}
@@ -58,6 +59,7 @@ void dsp_drone_set(uint8_t r, uint8_t f, uint8_t en, uint8_t lvl) { (void)r; (vo
 void dsp_note_on(uint8_t slot, uint8_t midi, uint16_t vel, uint16_t gate) { (void)slot; (void)midi; (void)vel; (void)gate; }
 void dsp_voice_quick_release(uint8_t slot) { (void)slot; }
 void dsp_toll_trigger(uint8_t zone_id, uint8_t root) { (void)zone_id; (void)root; }
+void dsp_attack_sfx(uint8_t slot) { (void)slot; }
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel) { (void)is_high; (void)vel; }
 void dsp_all_notes_off(void) {}
 void dsp_tick_gates(void) {}
