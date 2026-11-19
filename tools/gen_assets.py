@@ -547,79 +547,37 @@ def make_sprite_palette():
     ]
 
 
-def load_boss_sprite(zone_id):
-    from collections import deque
-    p = ASSETS / "bosses" / f"boss_{zone_id}.png"
-    im = Image.open(p).convert("RGB").resize((32, 32), Image.NEAREST)
+def quantize_rgba_32(path):
+    im = Image.open(path).convert("RGBA").resize((32, 32), Image.NEAREST)
     px = im.load()
-    vis = [[False] * 32 for _ in range(32)]
-    q = deque([(x, 0) for x in range(32)] + [(x, 31) for x in range(32)] +
-              [(0, y) for y in range(32)] + [(31, y) for y in range(32)])
-    bg = [[False] * 32 for _ in range(32)]
-    while q:
-        x, y = q.popleft()
-        if x < 0 or x >= 32 or y < 0 or y >= 32 or vis[y][x]:
-            continue
-        r, g, b = px[x, y]
-        if r < 12 and g < 12 and b < 12:
-            vis[y][x] = True
-            bg[y][x] = True
-            q.extend([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)])
-
-    # Quantize non-bg pixels to 15 colors + index 0 transparent
-    fg_im = Image.new("RGB", (32, 32), (16, 14, 24))
-    fg_px = fg_im.load()
+    fg = Image.new("RGB", (32, 32), (16, 14, 24))
+    fg_px = fg.load()
+    mask = [[False] * 32 for _ in range(32)]
     for y in range(32):
         for x in range(32):
-            if not bg[y][x]:
-                fg_px[x, y] = px[x, y]
-    q_im = fg_im.quantize(colors=15, method=Image.MEDIANCUT, dither=0)
+            r, g, b, a = px[x, y]
+            if a >= 96:
+                mask[y][x] = True
+                fg_px[x, y] = (r, g, b)
+    q_im = fg.quantize(colors=15, method=Image.MEDIANCUT, dither=0)
     raw_pal = q_im.getpalette()[:45]
     pal = [(0, 0, 0)] + [(raw_pal[i * 3], raw_pal[i * 3 + 1], raw_pal[i * 3 + 2]) for i in range(15)]
     q_px = list(q_im.getdata())
-    grid = [[0 if bg[y][x] else (q_px[y * 32 + x] + 1) for x in range(32)] for y in range(32)]
+    grid = [[0 if not mask[y][x] else (q_px[y * 32 + x] + 1) for x in range(32)] for y in range(32)]
     return grid, [rgb_to_565(*c) for c in pal]
 
 
-def load_or_gen_party_sprites(sp_pal):
-    from collections import deque
-    out = {}
+def load_boss_sprite(zone_id):
+    return quantize_rgba_32(ASSETS / "bosses" / f"boss_{zone_id}.png")
+
+
+def load_party_sprites():
+    grids, pals = {}, {}
     for name in ("fighter", "wmage", "sorceress"):
-        p = ASSETS / "sprites" / f"{name}.png"
-        if p.exists():
-            im = Image.open(p).convert("RGB").resize((32, 32), Image.NEAREST)
-            px = im.load()
-            # Flood-fill black/near-black background from edges as transparent (0)
-            vis = [[False] * 32 for _ in range(32)]
-            q = deque([(x, 0) for x in range(32)] + [(x, 31) for x in range(32)] +
-                      [(0, y) for y in range(32)] + [(31, y) for y in range(32)])
-            bg = [[False] * 32 for _ in range(32)]
-            while q:
-                x, y = q.popleft()
-                if x < 0 or x >= 32 or y < 0 or y >= 32 or vis[y][x]:
-                    continue
-                r, g, b = px[x, y]
-                if r < 24 and g < 24 and b < 24:
-                    vis[y][x] = True
-                    bg[y][x] = True
-                    q.extend([(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)])
-            grid = [[0] * 32 for _ in range(32)]
-            for y in range(32):
-                for x in range(32):
-                    if bg[y][x]:
-                        grid[y][x] = 0
-                        continue
-                    r, g, b = px[x, y]
-                    best_i, best_d = 1, 10**9
-                    for idx in range(1, 16):
-                        pr, pg, pb = sp_pal[idx]
-                        d = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
-                        if d < best_d:
-                            best_d = d
-                            best_i = idx
-                    grid[y][x] = best_i
-            out[name] = grid
-    return out
+        g, p = quantize_rgba_32(ASSETS / "sprites" / f"{name}.png")
+        grids[name] = g
+        pals[name] = p
+    return grids, pals
 
 
 def gen_party_sprites():
@@ -744,7 +702,7 @@ def main():
         rgb_to_565(255, 255, 255),
     ]
     sprites = gen_party_sprites()
-    party_32 = load_or_gen_party_sprites(sp_pal)
+    party_32, party_pals = load_party_sprites()
     boss_grids, boss_pals = [], []
     for z in range(9):
         bg_grid, bg_pal = load_boss_sprite(z)
@@ -764,6 +722,7 @@ def main():
         "    uint8_t  zone_maps[9][4800];",
         "    uint16_t sprite_pal[16];",
         "    uint16_t freeze_pal[16];",
+        "    uint16_t party_pals[3][16];",
         "    uint8_t  party_sprites[3][512];",
         "    uint8_t  cursor_sprite[128];",
         "    uint16_t boss_pals[9][16];",
@@ -788,6 +747,11 @@ def main():
     lines.append("    },")
     lines.append("    .sprite_pal = { " + ", ".join(f"0x{c:04X}u" for c in sp_pal_565) + " },")
     lines.append("    .freeze_pal = { " + ", ".join(f"0x{c:04X}u" for c in freeze_pal_565) + " },")
+    lines.append("    .party_pals = {")
+    for name in ("fighter", "wmage", "sorceress"):
+        vals = ", ".join(f"0x{c:04X}u" for c in party_pals[name])
+        lines.append(f"        {{ {vals} }},")
+    lines.append("    },")
     lines.append("    .party_sprites = {")
     for name in ("fighter", "wmage", "sorceress"):
         sdata = pack_nibbles(party_32[name])

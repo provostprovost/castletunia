@@ -210,7 +210,7 @@ static void render_header(void)
 
 static void render_party_slot(uint8_t s, int base_x)
 {
-    const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.sprite_pal;
+    const uint16_t *pal = g_state.slots[s].frozen ? G_FREEZE_PALETTE : fantasia_assets.party_pals[s];
     int hop = (g_state.slots[s].anim_timer > 0u) ? -3 : 0;
     int base_y = 182;
 
