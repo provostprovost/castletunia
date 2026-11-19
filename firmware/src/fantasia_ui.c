@@ -85,7 +85,7 @@ static void render_battle_sprites(void)
                     uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
                     uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                     if (ci != 0u) {
-                        bg = (g_state.boss_hit_timer > 0u && (g_state.boss_hit_timer & 1u))
+                        bg = (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u)
                            ? 0xFFFFu : fantasia_assets.boss_pals[z][ci];
                     }
                 }
