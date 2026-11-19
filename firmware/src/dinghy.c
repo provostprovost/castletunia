@@ -82,6 +82,21 @@ static void app_main(void)
                       g_state.settings.mix_drone);
     }
     input_init();
+#ifndef DINGHY_HOST
+    ui_render_splash();
+    {
+        uint32_t splash_start = hal_ms();
+        hal_platform_poll();
+        (void)hal_input_edges(0);
+        uint32_t init_keys = fm1_in.notes;
+        while ((hal_ms() - splash_start) < 3000u) {
+            hal_platform_poll();
+            if (hal_input_edges(0) != 0u || (fm1_in.notes & ~init_keys) != 0u) {
+                break;
+            }
+        }
+    }
+#endif
     ui_init();
 
     uint32_t last_ui_ms = 0u;

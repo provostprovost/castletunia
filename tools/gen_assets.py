@@ -696,6 +696,26 @@ def pack_nibbles(grid):
     return out
 
 
+def load_splash():
+    from PIL import Image
+    src = ROOT / "assets" / "splash.jpg"
+    im = Image.open(src).convert("RGB")
+    sm = im.resize((120, 120), Image.NEAREST)
+    q = sm.quantize(colors=16, method=Image.MEDIANCUT, dither=0)
+    raw_pal = q.getpalette()[: 16 * 3]
+    pal565 = []
+    for i in range(16):
+        r, g, b = raw_pal[i * 3 : i * 3 + 3]
+        if r < 24 and g < 24 and b < 24:
+            r, g, b = 0, 0, 0
+        pal565.append(rgb_to_565(r, g, b))
+    px = list(q.getdata())
+    grid = [px[y * 120 : (y + 1) * 120] for y in range(120)]
+    PREVIEWS.mkdir(parents=True, exist_ok=True)
+    q.convert("RGB").resize((240, 240), Image.NEAREST).save(PREVIEWS / "splash_preview.png")
+    return pal565, pack_nibbles(grid)
+
+
 def main():
     PREVIEWS.mkdir(parents=True, exist_ok=True)
     OUT_H.parent.mkdir(parents=True, exist_ok=True)
@@ -735,6 +755,7 @@ def main():
         bg_grid, bg_pal = load_boss_sprite(z)
         boss_grids.append(pack_nibbles(bg_grid))
         boss_pals.append(bg_pal)
+    splash_pal, splash_data = load_splash()
 
     lines = [
         "/* SPDX-License-Identifier: GPL-3.0-only */",
@@ -756,6 +777,8 @@ def main():
         "    uint8_t  cursor_sprite[128];",
         "    uint16_t boss_pals[9][16];",
         "    uint8_t  boss_sprites[9][4608];",
+        "    uint16_t splash_pal[16];",
+        "    uint8_t  splash_data[7200];",
         "} FantasiaAssets;",
         "",
         "static const FantasiaAssets fantasia_assets = {",
@@ -816,6 +839,12 @@ def main():
             chunk = ", ".join(f"0x{b:02X}u" for b in data[off:off + 24])
             lines.append(f"            {chunk},")
         lines.append("        },")
+    lines.append("    },")
+    lines.append("    .splash_pal = { " + ", ".join(f"0x{c:04X}u" for c in splash_pal) + " },")
+    lines.append("    .splash_data = {")
+    for off in range(0, len(splash_data), 24):
+        chunk = ", ".join(f"0x{b:02X}u" for b in splash_data[off:off + 24])
+        lines.append(f"        {chunk},")
     lines.append("    }")
     lines.append("};")
     lines.append("")

@@ -416,6 +416,22 @@ static void render_ticker(void)
     hal_draw_text(8, 223, 224, buf, 0x5E7Fu, hud_bg_color(223), 0);
 }
 
+void ui_render_splash(void)
+{
+    for (int y = 0; y < 240; y++) {
+        int sy = y >> 1;
+        for (int x = 0; x < 240; x++) {
+            int sx = x >> 1;
+            uint32_t idx = (uint32_t)sy * 120u + (uint32_t)sx;
+            uint8_t packed = fantasia_assets.splash_data[idx >> 1];
+            uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
+            g_scanline[x] = fantasia_assets.splash_pal[ci];
+        }
+        hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
+    }
+    hal_draw_text(8, 224, 224, "BRIAN PROVOST   v0.1", 0xFE60u, 0x0021u, 1);
+}
+
 void ui_init(void)
 {
     for (int i = 0; i < NUM_PARTICLES; i++) {
