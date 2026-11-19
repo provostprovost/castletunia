@@ -210,6 +210,13 @@ void dsp_boss_attack_sfx(uint8_t zone_id)
     start_fm_voice(&g_toll, &BOSS_SFX[z], NOTES[z], 30000u, 20u);
 }
 
+void dsp_shatter_sfx(void)
+{
+    static const FmPatch SHATTER_PATCH = {9, 4, 52000, 14000, 64, 31800, 0, 31200};
+    start_fm_voice(&g_toll, &SHATTER_PATCH, 84u, 28000u, 14u);
+    dsp_perc_trigger(1u, 26000u);
+}
+
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel_q15)
 {
     uint8_t ch = is_high ? 1u : 0u;

@@ -495,15 +495,21 @@ void engine_spell_mirror_toggle(void)
 
 void engine_spell_shatter(void)
 {
+    g_state.playing = 1u;
+    dsp_shatter_sfx();
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         if (!g_state.slots[s].frozen && g_state.slots[s].note_count > 0u) {
-            if ((engine_prng() % 100u) < 75u) {
-                SeedSlot tmp = g_state.slots[s];
+            SeedSlot tmp = g_state.slots[s];
+            for (uint8_t k = 0; k < 3u; k++) {
                 apply_drift_to_slot(&tmp, 80u);
-                tmp.anim_timer = 10u;
-                g_state.staging_slots[s] = tmp;
-                g_state.slot_pending[s] = 1u;
             }
+            uint8_t len = tmp.base_length ? tmp.base_length : 16u;
+            for (uint8_t i = 1u; i < tmp.note_count; i++) {
+                tmp.step_pos[i] = (uint8_t)((tmp.step_pos[i] + 3u) % len);
+            }
+            tmp.anim_timer = 10u;
+            g_state.staging_slots[s] = tmp;
+            g_state.slot_pending[s] = 1u;
         }
     }
     g_state.shake_timer = 8u;

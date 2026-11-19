@@ -12,6 +12,7 @@ void dsp_voice_quick_release(uint8_t slot);
 void dsp_toll_trigger(uint8_t zone_id, uint8_t root_midi);
 void dsp_attack_sfx(uint8_t slot);
 void dsp_boss_attack_sfx(uint8_t zone_id);
+void dsp_shatter_sfx(void);
 void dsp_perc_trigger(uint8_t is_high, uint16_t vel_q15);
 void dsp_all_notes_off(void);
 void dsp_tick_gates(void);
