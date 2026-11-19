@@ -191,8 +191,11 @@ void engine_toggle_freeze(uint8_t slot)
 {
     if (slot >= NUM_PARTY_SLOTS) return;
     g_state.slots[slot].frozen ^= 1u;
-    if (g_state.slots[slot].frozen && g_state.next_slot == slot) {
-        g_state.next_slot = find_next_unfrozen_slot((uint8_t)((slot + 1u) % NUM_PARTY_SLOTS));
+    if (g_state.slots[slot].frozen) {
+        dsp_voice_quick_release(slot);
+        if (g_state.next_slot == slot) {
+            g_state.next_slot = find_next_unfrozen_slot((uint8_t)((slot + 1u) % NUM_PARTY_SLOTS));
+        }
     }
     g_state.dirty_party = 1u;
     engine_set_ticker(g_state.slots[slot].frozen ? "> PARTY MEMBER FROZEN" : "> THAWED!");
@@ -694,7 +697,7 @@ void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
 static void trigger_slot_step(uint8_t s, uint8_t step)
 {
     SeedSlot *sl = &g_state.slots[s];
-    if (sl->note_count == 0u) return;
+    if (sl->frozen || sl->note_count == 0u) return;
     /* Never steal/overwrite the voice of the Party member currently recording */
     if ((g_state.capture.active || g_state.held_keys_mask != 0u) && s == g_state.next_slot) return;
 
