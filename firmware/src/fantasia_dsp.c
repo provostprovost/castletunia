@@ -397,7 +397,7 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t chord_sum = (d1 + d2 + d3) >> 1;
     int32_t drone_raw = q15_mul(chord_sum, lfo_gain);
     g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5000 + (int32_t)g_state.settings.harmony * 30);
-    int32_t drone = q15_mul(g_drone_lpf, g_drone_level_q15);
+    int32_t drone = g_state.playing ? q15_mul(g_drone_lpf, g_drone_level_q15) : 0;
 
     /* 2. Three-Member Party FM Engine + Toll Voice */
     int32_t grit = 0;
@@ -408,9 +408,14 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
         uint8_t zc = g_state.settings.zone_id % 9u;
         if (zc == 3u || zc == 8u || zc == 1u) grit += 12000;
     }
+    /* Sorceress (slot 2) gets gentle magical vibrato shimmer */
+    if (g_party[2].stage != ENV_OFF) {
+        int32_t vib = ((int32_t)(g_drone_lfo_ph >> 16) >> 8); /* -128..127 */
+        g_party[2].phase_c += (uint32_t)(vib * 400);
+    }
     int32_t v0 = render_fm_voice(&g_party[0], &z->party_patches[0], grit);
-    int32_t v1 = render_fm_voice(&g_party[1], &z->party_patches[1], grit);
-    int32_t v2 = render_fm_voice(&g_party[2], &z->party_patches[2], grit);
+    int32_t v1 = render_fm_voice(&g_party[1], &z->party_patches[1], grit >> 2);
+    int32_t v2 = render_fm_voice(&g_party[2], &z->party_patches[2], grit >> 1);
     int32_t vt = render_fm_voice(&g_toll, &z->toll_patch, 0);
 
     /* 3. Zone-Specific 2-Channel FM Percussion */

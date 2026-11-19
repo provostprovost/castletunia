@@ -420,6 +420,10 @@ void seed_commit_capture(void)
 void engine_on_key_down(uint8_t key_idx)
 {
     if (key_idx >= 27u) return;
+    if (!g_state.playing) {
+        g_state.playing = 1u;
+        engine_set_ticker("> PLAYING");
+    }
     g_state.held_keys_mask |= (1u << key_idx);
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
