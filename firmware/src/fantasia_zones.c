@@ -13,9 +13,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 96,
         .reverb_fb = 26800,
         .party_patches = {
-            {2, 1, 24000, 10000, 220, 32640, 22000, 31800}, /* Crypt Fighter: dark pipe organ bass */
-            {4, 1, 20000,     0, 100, 32550,  8000, 32400}, /* Crypt Cleric: cathedral bell */
-            {1, 2, 14000,  2000, 900, 32710, 26000, 32450}  /* Crypt Sorceress: eerie sub-octave haunt */
+            {2, 1, 28000, 14000, 140, 32660, 25000, 31900}, /* Crypt Fighter: loud dark pipe organ */
+            {4, 1, 18000,     0, 100, 32550,  8000, 32350}, /* Crypt Cleric: cathedral bell */
+            {1, 2, 12000,  2000, 900, 32710, 24000, 32400}  /* Crypt Sorceress: eerie sub-octave haunt */
         },
         .perc_low  = { 800,  200, 32000,  2000, 1,  8000, 32758},
         .perc_high = {2000, 1000, 30000, 28000, 4, 16000, 32735},
@@ -36,9 +36,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 48,
         .reverb_fb = 21500,
         .party_patches = {
-            {1, 1, 22000,  6000,  80, 32350,  5000, 31200}, /* Tavern Fighter: warm plucked lute */
-            {3, 1, 16000,     0,  80, 32420,  6000, 32100}, /* Tavern Cleric: plucked harp */
-            {2, 1, 10000,     0, 600, 32680, 24000, 32200}  /* Tavern Sorceress: mellow wooden flute */
+            {1, 1, 28000, 12000,  80, 32640, 24000, 31800}, /* Tavern Fighter: loud warm lute/accordion */
+            {3, 1, 16000,     0,  80, 32450,  7000, 32100}, /* Tavern Cleric: plucked harp */
+            {2, 1, 10000,     0, 600, 32680, 22000, 32200}  /* Tavern Sorceress: mellow wooden flute */
         },
         .perc_low  = {1000,  300, 31500,  1500, 1,  4000, 32752},
         .perc_high = {3000, 1500, 29000, 24000, 3, 12000, 32728},
@@ -82,9 +82,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 84,
         .reverb_fb = 25800,
         .party_patches = {
-            {1, 1, 32000, 18000,  80, 32450, 10000, 31500}, /* Castle Fighter: bright harpsichord */
-            {3, 1, 20000,  4000, 300, 32660, 18000, 32350}, /* Castle Cleric: gothic choir */
-            {2, 1, 22000,  8000, 750, 32710, 26000, 32400}  /* Castle Sorceress: rich vampyric strings */
+            {1, 1, 30000, 16000,  80, 32640, 25000, 31800}, /* Castle Fighter: loud bright harpsichord */
+            {3, 1, 18000,  3000, 300, 32660, 16000, 32300}, /* Castle Cleric: gothic choir */
+            {2, 1, 18000,  6000, 750, 32710, 24000, 32350}  /* Castle Sorceress: rich vampyric strings */
         },
         .perc_low  = { 850,  180, 32200,   800, 1,  6000, 32756},
         .perc_high = {2500, 1200, 29500, 26000, 4, 14000, 32722},
@@ -105,9 +105,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 78,
         .reverb_fb = 24800,
         .party_patches = {
-            {7, 4, 28000, 12000, 100, 32480, 12000, 31600}, /* Sands Fighter: metallic sitar/oud buzz */
-            {6, 1, 24000,     0,  80, 32400,  6000, 32200}, /* Sands Cleric: desert finger-cymbal */
-            {3, 2, 20000,  6000, 500, 32690, 25000, 32350}  /* Sands Sorceress: nasal desert horn */
+            {2, 1, 30000, 14000, 100, 32650, 25000, 31800}, /* Sands Fighter: loud desert sitar/oud */
+            {5, 1, 18000,     0,  80, 32450,  7000, 32200}, /* Sands Cleric: desert finger-cymbal */
+            {3, 2, 16000,  4000, 500, 32690, 22000, 32300}  /* Sands Sorceress: nasal desert horn */
         },
         .perc_low  = {1200,  400, 31000,  3000, 2, 10000, 32753},
         .perc_high = {3500, 1800, 28500, 22000, 3, 10000, 32726},
@@ -128,9 +128,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 110,
         .reverb_fb = 27600,
         .party_patches = {
-            {5, 2, 26000, 10000, 180, 32600, 18000, 31700}, /* Spire Fighter: resonant FM laser bass */
-            {7, 1, 24000,     0, 100, 32580, 10000, 32450}, /* Spire Cleric: crystal glass chime */
-            {4, 3, 18000,  4000, 950, 32720, 26000, 32450}  /* Spire Sorceress: sci-fi cosmic pad */
+            {2, 1, 28000, 12000, 120, 32660, 25000, 31900}, /* Spire Fighter: loud resonant synth bass */
+            {3, 1, 14000,     0, 120, 32560,  8000, 32350}, /* Spire Cleric: gentle crystal chime */
+            {2, 1, 12000,  1500, 800, 32700, 18000, 32400}  /* Spire Sorceress: soft cosmic pad */
         },
         .perc_low  = { 700,  100, 32500,   500, 1,  2000, 32760},
         .perc_high = {5000, 3000, 27000, 18000, 5, 20000, 32745},
@@ -174,9 +174,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .reverb_mix = 64,
         .reverb_fb = 23500,
         .party_patches = {
-            {1, 1, 30000, 16000, 140, 32640, 24000, 31700}, /* Coronation Fighter: bright royal trumpet */
-            {5, 2, 22000,     0, 100, 32560, 11000, 32400}, /* Coronation Cleric: tubular bells */
-            {3, 2, 22000,  6000, 400, 32700, 26000, 32350}  /* Coronation Sorceress: brass fanfare lead */
+            {1, 1, 30000, 16000, 140, 32650, 25000, 31800}, /* Coronation Fighter: royal trumpet */
+            {2, 1, 26000, 12000, 180, 32640, 23000, 31900}, /* Coronation Cleric: french horn brass */
+            {1, 1, 24000, 10000, 220, 32660, 24000, 32000}  /* Coronation Sorceress: brass fanfare lead */
         },
         .perc_low  = { 880,  220, 32100,   900, 1,  5000, 32755},
         .perc_high = {2800, 1400, 29000, 25000, 3, 15000, 32738},
@@ -191,15 +191,15 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .name = "BOSS",
         .subgenre_id = 8,
         .default_bpm = 138,
-        .scale_semitones = {0, 1, 3, 5, 7, 8, 10},
+        .scale_semitones = {0, 1, 3, 6, 7, 8, 10}, /* Dark Locrian/tritone horror scale */
         .mid_prog = {0, 1, 5, 4},
         .high_prog = {0, 1, 4, 1},
-        .reverb_mix = 40,
-        .reverb_fb = 20000,
+        .reverb_mix = 52,
+        .reverb_fb = 22500,
         .party_patches = {
-            {1, 1, 36000, 22000, 100, 32620, 24000, 31500}, /* Boss Fighter: overdriven shred bass */
-            {4, 1, 26000,  4000,  80, 32500, 10000, 32200}, /* Boss Cleric: sharp metallic synth-bell */
-            {3, 1, 24000,  8000, 120, 32680, 26000, 32100}  /* Boss Sorceress: piercing 16-bit square lead */
+            {1, 1, 34000, 22000,  80, 32650, 26000, 31700}, /* Boss Fighter: fierce shred bass */
+            {7, 3, 24000,  8000,  80, 32550, 14000, 32300}, /* Boss Cleric: dissonant horror bell */
+            {3, 2, 24000, 12000, 120, 32680, 24000, 32200}  /* Boss Sorceress: menacing dark organ lead */
         },
         .perc_low  = { 950,  120, 32600,  4000, 2, 14000, 32754},
         .perc_high = {3200, 1600, 28200, 31000, 4, 22000, 32748},

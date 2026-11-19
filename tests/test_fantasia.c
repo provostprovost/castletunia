@@ -103,7 +103,7 @@ static void run_stage1(void)
         uint8_t n0 = engine_note_for_degree(d, 0);
         uint8_t n1 = engine_note_for_degree(d, 1);
         uint8_t n2 = engine_note_for_degree(d, 2);
-        assert(n0 >= 48 && n0 <= 67);
+        assert(n0 >= 52 && n0 <= 71);
         assert(n1 >= 60 && n1 <= 79);
         assert(n2 >= 67 && n2 <= 88);
     }
@@ -120,10 +120,7 @@ static void run_stage1(void)
     assert(g_state.capture.active == 1); /* Not committed yet */
     for (int t = 0; t < 20; t++) engine_tick_ppqn();
     assert(g_state.capture.active == 0);
-    assert(g_state.slot_pending[0] == 1);
-    assert(g_state.staging_slots[0].note_count == 2);
-    g_state.slots[0] = g_state.staging_slots[0];
-    g_state.slot_pending[0] = 0;
+    assert(g_state.slots[0].note_count == 2);
 
     /* 4. Freeze slot skipping & All-frozen Live Jam bypass */
     engine_toggle_freeze(0);

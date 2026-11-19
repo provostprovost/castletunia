@@ -72,8 +72,8 @@ uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
     int32_t midi = 36 + (int32_t)(g_state.settings.root_semitone % 12u)
                  + oct * 12 + (int32_t)z->scale_semitones[d];
 
-    /* Party Register Clamping: Slot 0 (48..67), Slot 1 (60..79), Slot 2 (67..88) */
-    int32_t lo = 48, hi = 67;
+    /* Party Register Clamping: Slot 0 (52..71), Slot 1 (60..79), Slot 2 (67..88) */
+    int32_t lo = 52, hi = 71;
     if (slot == 1u) { lo = 60; hi = 79; }
     else if (slot >= 2u) { lo = 67; hi = 88; }
 
@@ -386,24 +386,21 @@ void seed_commit_capture(void)
         }
     }
 
+    g_state.slots[s] = ns;
+    g_state.staging_slots[s] = ns;
+    g_state.slot_pending[s] = 0u;
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
     g_state.capture.active = 0u;
     g_state.capture.count = 0u;
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
     g_state.attack_timer[s] = 15u;
-    uint8_t was_paused = !g_state.playing;
     g_state.playing = 1u;
-    if (was_paused) {
-        g_state.tick_in_16th = 0u;
-        g_state.step_16th = 0u;
-        g_state.bar_count = 0u;
-    }
-    /* Immediately play first note of the entered tune and launch count flying notes at Boss */
-    if (ns.note_count > 0u && ns.scale_deg[0] >= 0) {
-        uint8_t m0 = engine_note_for_degree(ns.scale_deg[0], s);
-        dsp_note_on(s, m0, 32767u, 12u);
-    }
+    /* Align step_16th so the entered melody starts immediately on beat 1 */
+    static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 3u, 6u};
+    g_state.tick_in_16th = 0u;
+    g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
+    /* Launch exact number of flying music notes at Boss (no chime SFX) */
     for (uint8_t i = 0; i < count && i < MAX_SEED_NOTES; i++) {
         int16_t y0 = (int16_t)(38 + (int)s * 44);
         g_state.note_fx[i].x = 172;
@@ -415,7 +412,6 @@ void seed_commit_capture(void)
         g_state.note_fx[i].active = 1u;
     }
     g_state.boss_hit_timer = 12u;
-    dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
     static const char *const ATK_MSG[3] = {
