@@ -160,13 +160,13 @@ static void run_stage1(void)
     engine_adjust_macro(ENC_ALGORITHM, 5, 0);
     assert(g_state.settings.intensity == 60);
     engine_adjust_macro(ENC_KNOB1, 5, 0);
-    assert(g_state.settings.drift == 48);
+    assert(g_state.settings.drift == 52);
     engine_adjust_macro(ENC_KNOB2, 5, 0);
-    assert(g_state.settings.density == 70);
+    assert(g_state.settings.density == 72);
     engine_adjust_macro(ENC_KNOB3, 5, 0);
-    assert(g_state.settings.harmony == 68);
+    assert(g_state.settings.harmony == 72);
     engine_adjust_macro(ENC_KNOB4, 5, 0);
-    assert(g_state.settings.weave == 45);
+    assert(g_state.settings.weave == 65);
 
     printf("Stage 1 PASSED!\n");
 }

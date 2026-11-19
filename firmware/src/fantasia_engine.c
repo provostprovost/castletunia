@@ -84,11 +84,28 @@ uint8_t engine_note_for_degree(int32_t deg, uint8_t slot)
     return (uint8_t)midi;
 }
 
+static void format_pct_ticker(const char *label, uint8_t val)
+{
+    char msg[32];
+    int i = 0;
+    msg[i++] = '>'; msg[i++] = ' ';
+    while (*label && i < 22) msg[i++] = *label++;
+    msg[i++] = ':'; msg[i++] = ' ';
+    if (val >= 100u) msg[i++] = (char)('0' + (val / 100u));
+    if (val >= 10u)  msg[i++] = (char)('0' + ((val / 10u) % 10u));
+    msg[i++] = (char)('0' + (val % 10u));
+    msg[i++] = '%';
+    msg[i] = '\0';
+    engine_set_ticker(msg);
+}
+
 static void update_drone_pitch(void)
 {
-    uint8_t root = engine_drone_root_midi();
+    const ZoneDef *z = zone_get(g_state.settings.zone_id);
+    uint8_t d = g_state.active_chord_deg % 7u;
+    uint8_t root = (uint8_t)(48u + ((g_state.settings.root_semitone + z->scale_semitones[d]) % 12u));
     uint8_t fifth = (uint8_t)(root + 7u);
-    uint8_t fifth_en = (g_state.settings.harmony >= 26u) ? 1u : 0u;
+    uint8_t fifth_en = (g_state.settings.harmony >= 20u) ? 1u : 0u;
     dsp_drone_set(root, fifth, fifth_en, g_state.settings.mix_drone);
 }
 
@@ -103,10 +120,10 @@ void engine_init_defaults(void)
     g_state.settings.root_semitone = 2u; /* D */
     g_state.settings.bpm = G_ZONES[0].default_bpm;
     g_state.settings.intensity = 40u;
-    g_state.settings.drift = 28u;
-    g_state.settings.density = 50u;
-    g_state.settings.harmony = 48u;
-    g_state.settings.weave = 25u;
+    g_state.settings.drift = 32u;
+    g_state.settings.density = 52u;
+    g_state.settings.harmony = 52u;
+    g_state.settings.weave = 45u;
     g_state.settings.mix_drone = 88u;
     g_state.settings.mix_slots[0] = 108u;
     g_state.settings.mix_slots[1] = 100u;
@@ -267,8 +284,8 @@ void seed_commit_capture(void)
     }
 
     ns.note_count = count;
-    ns.base_length = (count <= 3u && max_step < 8u) ? 8u : 16u;
-    static const uint8_t WEAVE_LENS[3][2] = { {5u, 7u}, {7u, 11u}, {11u, 13u} };
+    ns.base_length = (count <= 3u && max_step < 8u) ? 16u : 32u;
+    static const uint8_t WEAVE_LENS[3][2] = { {7u, 11u}, {11u, 13u}, {13u, 17u} };
     ns.weave_length = WEAVE_LENS[s][engine_prng() & 1u];
     ns.playhead = 0u;
     ns.frozen = 0u;
@@ -296,7 +313,7 @@ void seed_commit_capture(void)
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
     static const char *const ATK_MSG[3] = {
-        "> FIGHTER: SLASH!", "> W.MAGE: HOLY!", "> SORCERESS: FLARE!"
+        "> FIGHTER: SLASH!", "> CLERIC: HOLY!", "> SORCERESS: FLARE!"
     };
     engine_set_ticker(ATK_MSG[s]);
 }
@@ -483,7 +500,7 @@ void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
                 break;
             case ENC_KNOB2:
                 g_state.settings.mix_slots[1] = clamp_u8((int32_t)g_state.settings.mix_slots[1] + delta * 4, 0, 127);
-                engine_set_ticker("> W.MAGE VOL");
+                engine_set_ticker("> CLERIC VOL");
                 break;
             case ENC_KNOB3:
                 g_state.settings.mix_slots[2] = clamp_u8((int32_t)g_state.settings.mix_slots[2] + delta * 4, 0, 127);
@@ -512,24 +529,24 @@ void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
             break;
         case ENC_ALGORITHM:
             g_state.settings.intensity = clamp_u8((int32_t)g_state.settings.intensity + delta * 4, 0, 100);
-            engine_set_ticker("> INTENSITY");
+            format_pct_ticker("INTENSITY", g_state.settings.intensity);
             break;
         case ENC_KNOB1:
             g_state.settings.drift = clamp_u8((int32_t)g_state.settings.drift + delta * 4, 0, 100);
-            engine_set_ticker("> DRIFT");
+            format_pct_ticker("DRIFT", g_state.settings.drift);
             break;
         case ENC_KNOB2:
             g_state.settings.density = clamp_u8((int32_t)g_state.settings.density + delta * 4, 0, 100);
-            engine_set_ticker("> DENSITY");
+            format_pct_ticker("DENSITY", g_state.settings.density);
             break;
         case ENC_KNOB3:
             g_state.settings.harmony = clamp_u8((int32_t)g_state.settings.harmony + delta * 4, 0, 100);
             update_drone_pitch();
-            engine_set_ticker("> HARMONY");
+            format_pct_ticker("HARMONY", g_state.settings.harmony);
             break;
         case ENC_KNOB4:
             g_state.settings.weave = clamp_u8((int32_t)g_state.settings.weave + delta * 4, 0, 100);
-            engine_set_ticker("> WEAVE");
+            format_pct_ticker("WEAVE", g_state.settings.weave);
             break;
         default:
             break;
@@ -541,9 +558,9 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     SeedSlot *sl = &g_state.slots[s];
     if (sl->note_count == 0u) return;
 
-    uint8_t len = (g_state.settings.weave > 60u) ? sl->weave_length : sl->base_length;
+    uint8_t len = (g_state.settings.weave > 40u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
-    uint8_t pos = (uint8_t)(step % len);
+    uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step) % len);
 
     /* Wrap detection -> Drift & Cross-pollination decay */
     if (pos == 0u) {
@@ -611,14 +628,22 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 
     if (deg < 0) return;
 
+    /* 4-Bar A/B/A/C Phrase Evolution */
+    uint8_t form_bar = g_state.bar_count & 3u;
+    if (form_bar == 1u && (step & 3u) == 2u) {
+        deg += 2; /* Melodic answer */
+    } else if (form_bar == 3u && step >= 12u) {
+        deg += 4; /* Turnaround cadence lift */
+    }
+
     /* Harmony chord-tone gravity / voice-leading */
-    if (s == 0u && g_state.settings.harmony >= 26u) {
+    if (s == 0u && g_state.settings.harmony >= 15u) {
         deg = (deg % 7) + (int32_t)g_state.active_chord_deg;
-    } else if (s == 1u && g_state.settings.harmony > 50u) {
+    } else if (s == 1u && g_state.settings.harmony > 45u) {
         static const int8_t ARP[4] = {0, 2, 4, 6};
         uint8_t max_i = (g_state.settings.harmony > 75u) ? 4u : 3u;
         deg = (int32_t)g_state.active_chord_deg + ARP[pos % max_i];
-    } else if (s == 2u && g_state.settings.harmony > 75u && (pos & 1u)) {
+    } else if (s == 2u && g_state.settings.harmony > 65u && (pos & 1u)) {
         deg += ((pos & 2u) ? 4 : 6); /* 5th/7th harmonic color */
     }
 
@@ -708,17 +733,21 @@ void engine_tick_ppqn(void)
     }
 
     if (fire_main) {
-        /* Update active chord degree */
+        /* Update active chord degree & retune Drone on chord changes */
         const ZoneDef *z = zone_get(g_state.settings.zone_id);
         uint8_t bar_idx = g_state.bar_count & 3u;
+        uint8_t prev_chord = g_state.active_chord_deg;
         if (g_state.spells.resolve_armed) {
             g_state.active_chord_deg = (step < 8u) ? 4u : 0u;
-        } else if (g_state.settings.harmony >= 76u) {
+        } else if (g_state.settings.harmony >= 70u) {
             g_state.active_chord_deg = z->high_prog[bar_idx];
-        } else if (g_state.settings.harmony >= 26u) {
+        } else if (g_state.settings.harmony >= 15u) {
             g_state.active_chord_deg = z->mid_prog[bar_idx];
         } else {
             g_state.active_chord_deg = 0u;
+        }
+        if (g_state.active_chord_deg != prev_chord) {
+            update_drone_pitch();
         }
 
         if (step == 0u) g_state.beat1_flash = 4u;

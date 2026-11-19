@@ -274,7 +274,7 @@ static void render_header(void)
 
 static void render_party_row(uint8_t s, int row_y)
 {
-    static const char *const NAMES[3] = {"FIGHTER", "W.MAGE", "SORCERESS"};
+    static const char *const NAMES[3] = {"FIGHTER", "CLERIC", "SORCERESS"};
     /* Gloved pointer */
     for (int j = 0; j < 14; j++) {
         uint16_t bg = hud_bg_color(row_y + j);
@@ -294,35 +294,76 @@ static void render_party_row(uint8_t s, int row_y)
     uint16_t name_col = g_state.slots[s].frozen ? 0x5E7Fu : (g_state.next_slot == s ? 0xFE60u : 0xFFFFu);
     hal_draw_text(24, row_y, 82, NAMES[s], name_col, hud_bg_color(row_y), 0);
 
-    /* 64x6 step activity bar */
-    uint16_t active_mask = 0u;
-    for (uint8_t n = 0; n < g_state.slots[s].note_count; n++) {
-        if (g_state.slots[s].scale_deg[n] >= 0) {
-            active_mask |= (uint16_t)(1u << (g_state.slots[s].step_pos[n] & 15u));
-        }
-    }
+    /* Live 8-segment RPG Voice Activity Meter (pulses on note trigger) */
+    uint8_t level = g_state.slots[s].anim_timer; /* 0..8 */
+    if (level > 8u) level = 8u;
     for (int j = 0; j < 6; j++) {
         for (int i = 0; i < 64; i++) {
-            uint8_t step = (uint8_t)(i >> 2);
+            uint8_t seg = (uint8_t)(i >> 3); /* 0..7 */
+            uint8_t in_gap = ((i & 7) == 7);
             uint16_t c = 0x1084u;
-            if (step == g_state.slots[s].playhead && g_state.slots[s].note_count > 0u) {
-                c = 0xFFFFu;
-            } else if (active_mask & (1u << step)) {
-                c = g_state.slots[s].frozen ? 0x5E7Fu : 0xFE60u;
+            if (in_gap) {
+                c = hud_bg_color(row_y + 4 + j);
+            } else if (g_state.slots[s].note_count > 0u && seg < level) {
+                c = g_state.slots[s].frozen ? 0x5E7Fu : (seg >= 6 ? 0xFFFFu : 0xFE60u);
+            } else if (g_state.slots[s].note_count > 0u && seg == 0u) {
+                c = g_state.slots[s].frozen ? 0x2B55u : 0x4210u;
             }
             g_sprite_buf[j * 64 + i] = c;
         }
     }
-    hal_lcd_blit_rect(112, row_y + 4, 64, 6, g_sprite_buf);
+    hal_lcd_blit_rect(110, row_y + 4, 64, 6, g_sprite_buf);
 
-    const char *badge = g_state.slots[s].frozen ? "FROZEN" : (g_state.slots[s].note_count > 0u ? "ACTIVE" : "READY");
-    uint16_t bcol = g_state.slots[s].frozen ? 0x5E7Fu : (g_state.slots[s].note_count > 0u ? 0x87F0u : 0xAD55u);
+    char badge[8];
+    uint16_t bcol;
+    if (g_state.slots[s].frozen) {
+        badge[0]='F'; badge[1]='R'; badge[2]='Z'; badge[3]='\0';
+        bcol = 0x5E7Fu;
+    } else if (g_state.slots[s].note_count > 0u) {
+        uint8_t len = (g_state.settings.weave > 40u) ? g_state.slots[s].weave_length : g_state.slots[s].base_length;
+        badge[0] = (g_state.settings.weave > 40u) ? 'W' : 'L';
+        if (len >= 10u) {
+            badge[1] = (char)('0' + (len / 10u));
+            badge[2] = (char)('0' + (len % 10u));
+            badge[3] = '\0';
+        } else {
+            badge[1] = (char)('0' + len);
+            badge[2] = '\0';
+        }
+        bcol = 0x87F0u;
+    } else {
+        badge[0]='R'; badge[1]='D'; badge[2]='Y'; badge[3]='\0';
+        bcol = 0xAD55u;
+    }
     hal_draw_text(180, row_y, 54, badge, bcol, hud_bg_color(row_y), 2);
 }
 
 static void render_ticker(void)
 {
-    hal_draw_text(8, 223, 224, g_state.ticker, 0xFFFFu, hud_bg_color(223), 0);
+    if (g_state.ticker_timer > 0u) {
+        hal_draw_text(8, 223, 224, g_state.ticker, 0xFFFFu, hud_bg_color(223), 0);
+        return;
+    }
+    static const char *const DEG_ROMAN[7] = {"I", "II", "III", "IV", "V", "VI", "VII"};
+    char buf[32];
+    const char *deg = DEG_ROMAN[g_state.active_chord_deg % 7u];
+    int i = 0;
+    buf[i++]='C'; buf[i++]='H'; buf[i++]=':';
+    while (*deg) buf[i++] = *deg++;
+    buf[i++]=' ';
+    const char *lbl[3] = {"DRF:", "DNS:", "HRM:"};
+    uint8_t vals[3] = {g_state.settings.drift, g_state.settings.density, g_state.settings.harmony};
+    for (int m = 0; m < 3; m++) {
+        buf[i++]=' ';
+        const char *p = lbl[m];
+        while (*p) buf[i++] = *p++;
+        uint8_t v = vals[m];
+        if (v >= 100u) buf[i++] = (char)('0' + (v / 100u));
+        if (v >= 10u)  buf[i++] = (char)('0' + ((v / 10u) % 10u));
+        buf[i++] = (char)('0' + (v % 10u));
+    }
+    buf[i] = '\0';
+    hal_draw_text(8, 223, 224, buf, 0x5E7Fu, hud_bg_color(223), 0);
 }
 
 void ui_init(void)
@@ -367,7 +408,16 @@ void ui_render(void)
     if (g_state.boss_hit_timer > 0u) g_state.boss_hit_timer--;
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         if (g_state.attack_timer[s] > 0u) g_state.attack_timer[s]--;
-        if (g_state.slots[s].anim_timer > 0u) g_state.slots[s].anim_timer--;
+        if (g_state.slots[s].anim_timer > 0u) {
+            g_state.slots[s].anim_timer--;
+            g_state.dirty_party = 1u;
+        }
+    }
+    if (g_state.ticker_timer > 0u) {
+        g_state.ticker_timer--;
+        if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
+    } else {
+        g_state.dirty_ticker = 1u;
     }
 
     if (g_state.gold_flash_timer > 0u) {
