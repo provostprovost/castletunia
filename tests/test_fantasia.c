@@ -35,7 +35,7 @@ static uint32_t spy_toll_count = 0;
 static uint32_t spy_perc_count = 0;
 
 void dsp_init(void) {}
-void dsp_drone_set(uint8_t r, uint8_t f, uint8_t en, uint8_t lvl) { (void)r; (void)f; (void)en; (void)lvl; }
+void dsp_drone_set(uint8_t r, uint8_t t, uint8_t f, uint8_t te, uint8_t fe, uint8_t lvl) { (void)r; (void)t; (void)f; (void)te; (void)fe; (void)lvl; }
 void dsp_note_on(uint8_t slot, uint8_t midi, uint16_t vel, uint16_t gate) {
     (void)vel; (void)gate;
     spy_note_count++;
@@ -55,7 +55,7 @@ void dsp_render_sample(int32_t *l, int32_t *r) { *l = 0; *r = 0; }
 #include "fantasia_assets.h"
 #include "fantasia_ui.h"
 void dsp_init(void) {}
-void dsp_drone_set(uint8_t r, uint8_t f, uint8_t en, uint8_t lvl) { (void)r; (void)f; (void)en; (void)lvl; }
+void dsp_drone_set(uint8_t r, uint8_t t, uint8_t f, uint8_t te, uint8_t fe, uint8_t lvl) { (void)r; (void)t; (void)f; (void)te; (void)fe; (void)lvl; }
 void dsp_note_on(uint8_t slot, uint8_t midi, uint16_t vel, uint16_t gate) { (void)slot; (void)midi; (void)vel; (void)gate; }
 void dsp_voice_quick_release(uint8_t slot) { (void)slot; }
 void dsp_toll_trigger(uint8_t zone_id, uint8_t root) { (void)zone_id; (void)root; }
@@ -238,7 +238,7 @@ static void run_stage2(void)
 
     /* Tail decay test <= 2 LSB within 1.5s after dsp_all_notes_off() + drone off */
     g_state.playing = 0;
-    dsp_drone_set(36, 43, 0, 0);
+    dsp_drone_set(36, 39, 43, 0, 0, 0);
     dsp_all_notes_off();
     int32_t max_tail = 0;
     for (uint32_t i = 0; i < 44100u + 22050u; i++) {

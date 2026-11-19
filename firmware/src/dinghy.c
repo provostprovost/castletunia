@@ -74,9 +74,13 @@ static void app_main(void)
         for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
             g_state.slots[s] = g_state.settings.saved_slots[s];
         }
-        dsp_drone_set(engine_drone_root_midi(),
-                      (uint8_t)(engine_drone_root_midi() + 7u),
-                      (g_state.settings.harmony >= 26u) ? 1u : 0u,
+        const ZoneDef *z = zone_get(g_state.settings.zone_id);
+        uint8_t r = engine_drone_root_midi();
+        dsp_drone_set(r,
+                      (uint8_t)(r + z->scale_semitones[2]),
+                      (uint8_t)(r + z->scale_semitones[4]),
+                      (g_state.settings.harmony >= 35u) ? 1u : 0u,
+                      (g_state.settings.harmony >= 20u) ? 1u : 0u,
                       g_state.settings.mix_drone);
     }
     input_init();

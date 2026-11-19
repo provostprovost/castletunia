@@ -6,7 +6,7 @@
 #include "fantasia_types.h"
 
 void dsp_init(void);
-void dsp_drone_set(uint8_t root_midi, uint8_t fifth_midi, uint8_t fifth_enable, uint8_t level);
+void dsp_drone_set(uint8_t root_midi, uint8_t third_midi, uint8_t fifth_midi, uint8_t third_en, uint8_t fifth_en, uint8_t level);
 void dsp_note_on(uint8_t slot, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks);
 void dsp_voice_quick_release(uint8_t slot);
 void dsp_toll_trigger(uint8_t zone_id, uint8_t root_midi);

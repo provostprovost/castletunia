@@ -67,11 +67,12 @@ static FmVoice   g_party[NUM_PARTY_SLOTS];
 static FmVoice   g_toll;
 static PercVoice g_perc[2];
 
-/* Living Room Drone state */
-static uint32_t g_drone_ph1 = 0u, g_drone_ph2 = 0u;
-static uint32_t g_drone_inc1 = 0u, g_drone_inc2 = 0u;
+/* Atmospheric Backing Chord Pad state (Root + 3rd + 5th) */
+static uint32_t g_drone_ph1 = 0u, g_drone_ph2 = 0u, g_drone_ph3 = 0u;
+static uint32_t g_drone_inc1 = 0u, g_drone_inc2 = 0u, g_drone_inc3 = 0u;
 static uint32_t g_drone_lfo_ph = 0u;
 static int32_t  g_drone_lpf = 0;
+static uint8_t  g_drone_third_en = 0u;
 static uint8_t  g_drone_fifth_en = 0u;
 static int32_t  g_drone_level_q15 = 0;
 
@@ -121,15 +122,19 @@ void dsp_init(void)
     for (uint32_t i = 0; i < AP1_LEN; i++) g_ap1[i] = 0;
 }
 
-void dsp_drone_set(uint8_t root_midi, uint8_t fifth_midi, uint8_t fifth_enable, uint8_t level)
+void dsp_drone_set(uint8_t root_midi, uint8_t third_midi, uint8_t fifth_midi, uint8_t third_en, uint8_t fifth_en, uint8_t level)
 {
-    if (root_midi > 127u) root_midi = 36u;
-    if (fifth_midi > 127u) fifth_midi = 43u;
+    if (root_midi > 127u) root_midi = 48u;
+    if (third_midi > 127u) third_midi = 51u;
+    if (fifth_midi > 127u) fifth_midi = 55u;
     g_drone_inc1 = G_MIDI_PHASE_INC[root_midi];
+    uint32_t t_inc = G_MIDI_PHASE_INC[third_midi];
     uint32_t f_inc = G_MIDI_PHASE_INC[fifth_midi];
     g_drone_inc2 = f_inc + (f_inc / 667u); /* +0.15% detuned 5th */
-    g_drone_fifth_en = fifth_enable;
-    g_drone_level_q15 = (int32_t)level * 72; /* Supportive ambient bed under Party leads */
+    g_drone_inc3 = t_inc - (t_inc / 800u); /* -0.12% lush chorus 3rd */
+    g_drone_third_en = third_en;
+    g_drone_fifth_en = fifth_en;
+    g_drone_level_q15 = (int32_t)level * 96; /* Warm backing chord bed */
 }
 
 static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -358,18 +363,22 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
 {
     const ZoneDef *z = zone_get(g_state.settings.zone_id);
 
-    /* 1. Living Room Ambient Drone (active immediately on boot; octave-enriched for 28mm speaker) */
+    /* 1. Atmospheric Backing Chord Pad (Root + 3rd + 5th, Density-sensitive breathing) */
     g_drone_ph1 += g_drone_inc1;
     g_drone_ph2 += g_drone_inc2;
-    g_drone_lfo_ph += 17530u; /* ~0.18 Hz at 44.1 kHz */
+    g_drone_ph3 += g_drone_inc3;
+    uint32_t lfo_rate = 17530u + (uint32_t)g_state.settings.density * 350u;
+    g_drone_lfo_ph += lfo_rate;
     int32_t lfo_tri = (int16_t)(g_drone_lfo_ph >> 16);
     if (lfo_tri < 0) lfo_tri = -lfo_tri;
-    int32_t lfo_gain = 22938 + ((lfo_tri * 9829) >> 15); /* 70%..100% Q15 */
+    int32_t lfo_gain = 21000 + ((lfo_tri * 11767) >> 15);
 
-    int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 1)) >> 1;
+    int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 2)) >> 1;
     int32_t d2 = g_drone_fifth_en ? (hal_sine_q15(g_drone_ph2) >> 1) : 0;
-    int32_t drone_raw = q15_mul((d1 + d2) >> 1, lfo_gain);
-    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5500);
+    int32_t d3 = g_drone_third_en ? (hal_sine_q15(g_drone_ph3) >> 1) : 0;
+    int32_t chord_sum = (d1 + d2 + d3) >> 1;
+    int32_t drone_raw = q15_mul(chord_sum, lfo_gain);
+    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5000 + (int32_t)g_state.settings.harmony * 30);
     int32_t drone = q15_mul(g_drone_lpf, g_drone_level_q15);
 
     /* 2. Three-Member Party FM Engine + Toll Voice */
@@ -386,10 +395,10 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix: Fighter & Cleric boosted, Sorceress shimmering, Drone & Perc supportive */
-    int32_t p_mix = (pl >> 2) + (ph >> 2);
-    int32_t dry_l = (drone >> 1) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
-    int32_t dry_r = (drone >> 1) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
+    /* Stereo mix: Party leads forward, Backing Chords & Percussion supportive */
+    int32_t p_mix = (pl >> 1) + ((ph * 3) >> 3);
+    int32_t dry_l = ((drone * 3) >> 2) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
+    int32_t dry_r = ((drone * 3) >> 2) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
 
     /* 4. Schroeder 4-Comb + 2-Allpass Room Reverb */
     int32_t rev_in = (dry_l + dry_r) >> 2;

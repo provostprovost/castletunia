@@ -109,10 +109,18 @@ static void update_drone_pitch(void)
 {
     const ZoneDef *z = zone_get(g_state.settings.zone_id);
     uint8_t d = g_state.active_chord_deg % 7u;
-    uint8_t root = (uint8_t)(48u + ((g_state.settings.root_semitone + z->scale_semitones[d]) % 12u));
-    uint8_t fifth = (uint8_t)(root + 7u);
+    uint8_t root_off = (g_state.settings.root_semitone + z->scale_semitones[d]) % 12u;
+    uint8_t third_off = z->scale_semitones[(d + 2u) % 7u];
+    uint8_t fifth_off = z->scale_semitones[(d + 4u) % 7u];
+    uint8_t third_iv = (uint8_t)((third_off + 12u - z->scale_semitones[d]) % 12u);
+    uint8_t fifth_iv = (uint8_t)((fifth_off + 12u - z->scale_semitones[d]) % 12u);
+
+    uint8_t root = (uint8_t)(48u + root_off);
+    uint8_t third = (uint8_t)(root + third_iv);
+    uint8_t fifth = (uint8_t)(root + fifth_iv);
     uint8_t fifth_en = (g_state.settings.harmony >= 20u) ? 1u : 0u;
-    dsp_drone_set(root, fifth, fifth_en, g_state.settings.mix_drone);
+    uint8_t third_en = (g_state.settings.harmony >= 35u) ? 1u : 0u;
+    dsp_drone_set(root, third, fifth, third_en, fifth_en, g_state.settings.mix_drone);
 }
 
 void engine_init_defaults(void)
@@ -854,15 +862,18 @@ void engine_tick_ppqn(void)
             trigger_slot_step(2u, step);
         }
 
-        /* Percussion evaluation */
+        /* Percussion evaluation (sensitive to both Intensity and Density) */
         uint8_t inten = g_state.settings.intensity;
-        if (inten >= 26u && g_state.settings.mix_perc > 0u) {
+        uint8_t dens = g_state.settings.density;
+        if (inten >= 15u && g_state.settings.mix_perc > 0u) {
             uint16_t low_mask = 0u, high_mask = 0u;
-            if (inten <= 50u) {
-                low_mask = z->low_mask_march & 0x0101u;
+            if (inten <= 45u) {
+                low_mask = (dens >= 40u) ? z->low_mask_march : (z->low_mask_march & 0x0101u);
+                if (dens >= 55u) high_mask = z->high_mask_march & 0x1010u;
             } else if (inten <= 75u) {
                 low_mask = z->low_mask_march;
                 high_mask = z->high_mask_march;
+                if (dens >= 70u) high_mask |= 0x4444u;
             } else {
                 low_mask = z->low_mask_battle;
                 high_mask = z->high_mask_battle;
@@ -870,7 +881,8 @@ void engine_tick_ppqn(void)
                     high_mask |= (uint16_t)(1u << step);
                 }
             }
-            uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 160u);
+            if (dens < 25u) high_mask = 0u;
+            uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 200u);
             if (low_mask & (1u << step)) dsp_perc_trigger(0u, vel);
             if (high_mask & (1u << step)) dsp_perc_trigger(1u, vel);
             if (inten > 75u && (step & 3u) == 0u) {
