@@ -339,6 +339,7 @@ static void run_stage4(void)
     assert(loaded.zone_id == 3);
 
     /* 5. Key LEDs while paused = all 27 keys solid white */
+    g_state.playing = 1;
     mock_btn_press = (1u << BTN_PLAY);
     input_process();
     assert(g_state.playing == 0);

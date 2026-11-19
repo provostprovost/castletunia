@@ -154,7 +154,7 @@ void engine_init_defaults(void)
         }
     }
 
-    g_state.playing = 1u;
+    g_state.playing = 0u; /* Quiet on power-on until a phrase activates or a spell is cast */
     g_state.prng_state = 0x5EED16B1u;
     g_state.dirty_diorama = 1u;
     g_state.dirty_header = 1u;
@@ -392,6 +392,7 @@ void seed_commit_capture(void)
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
     g_state.attack_timer[s] = 15u;
+    g_state.playing = 1u;
     g_state.boss_hit_timer = 12u;
     dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
@@ -420,10 +421,6 @@ void seed_commit_capture(void)
 void engine_on_key_down(uint8_t key_idx)
 {
     if (key_idx >= 27u) return;
-    if (!g_state.playing) {
-        g_state.playing = 1u;
-        engine_set_ticker("> PLAYING");
-    }
     g_state.held_keys_mask |= (1u << key_idx);
     g_state.silence_ticks = 0u;
     g_state.silence_ms = 0u;
@@ -471,6 +468,7 @@ void engine_on_key_up(uint8_t key_idx)
 
 void engine_spell_haste_toggle(void)
 {
+    g_state.playing = 1u;
     g_state.spells.haste_active ^= 1u;
     g_state.dirty_party = 1u;
     engine_set_ticker(g_state.spells.haste_active ? "> CAST HASTE!" : "> HASTE FADED");
@@ -478,6 +476,7 @@ void engine_spell_haste_toggle(void)
 
 void engine_spell_mirror_toggle(void)
 {
+    g_state.playing = 1u;
     g_state.spells.mirror_active ^= 1u;
     g_state.dirty_diorama = 1u;
     engine_set_ticker(g_state.spells.mirror_active ? "> CAST MIRROR!" : "> MIRROR FADED");
@@ -485,6 +484,7 @@ void engine_spell_mirror_toggle(void)
 
 void engine_spell_shatter(void)
 {
+    g_state.playing = 1u;
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         if (!g_state.slots[s].frozen && g_state.slots[s].note_count > 0u) {
             if ((engine_prng() % 100u) < 75u) {
@@ -505,6 +505,7 @@ void engine_spell_shatter(void)
 
 void engine_spell_resolve(void)
 {
+    g_state.playing = 1u;
     g_state.spells.resolve_armed = 1u;
     g_state.gold_flash_timer = 10u;
     engine_set_ticker("> CAST RESOLVE!");
@@ -512,6 +513,7 @@ void engine_spell_resolve(void)
 
 void engine_spell_conjure(void)
 {
+    g_state.playing = 1u;
     uint8_t s = g_state.next_slot;
     if (g_state.slots[s].frozen) s = find_next_unfrozen_slot(s);
     if (g_state.slots[s].frozen) {
@@ -558,6 +560,7 @@ void engine_spell_conjure(void)
     g_state.slot_pending[s] = 1u;
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
     g_state.attack_timer[s] = 15u;
+    g_state.playing = 1u;
     g_state.boss_hit_timer = 12u;
     dsp_attack_sfx(s);
     g_state.dirty_diorama = 1u;
@@ -567,6 +570,7 @@ void engine_spell_conjure(void)
 
 void engine_spell_toll(void)
 {
+    g_state.playing = 1u;
     dsp_toll_trigger(g_state.settings.zone_id, engine_drone_root_midi());
     g_state.toll_ring_timer = 14u;
     g_state.dirty_diorama = 1u;
