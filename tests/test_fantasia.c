@@ -116,7 +116,7 @@ static void run_stage1(void)
     assert(g_state.capture.count == 2);
     for (int t = 0; t < 35; t++) engine_tick_ppqn();
     assert(g_state.capture.active == 1); /* Not committed yet */
-    for (int t = 0; t < 30; t++) engine_tick_ppqn();
+    for (int t = 0; t < 65; t++) engine_tick_ppqn();
     assert(g_state.capture.active == 0);
     assert(g_state.slot_pending[0] == 1);
     assert(g_state.staging_slots[0].note_count == 2);

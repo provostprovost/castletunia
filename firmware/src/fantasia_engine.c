@@ -422,7 +422,9 @@ void engine_on_key_down(uint8_t key_idx)
     }
 
     uint8_t midi = engine_note_for_degree((int32_t)key_idx, target_slot);
-    dsp_note_on(target_slot, midi, 32767u, 16u);
+    /* Ensure live key audition is above 196 Hz so it projects clearly on 28mm speaker */
+    uint8_t aud_midi = (midi < 55u) ? (uint8_t)(midi + 12u) : midi;
+    dsp_note_on(target_slot, aud_midi, 32767u, 48u);
 
     if (!g_state.capture.active) {
         g_state.capture.active = 1u;
@@ -804,7 +806,7 @@ void engine_tick_ppqn(void)
             if (denom > 0u) {
                 g_state.silence_ms += (60000u / denom);
             }
-            if (g_state.silence_ticks >= 36u && g_state.silence_ms >= 900u) {
+            if (g_state.silence_ticks >= 72u && g_state.silence_ms >= 2200u) {
                 seed_commit_capture();
             }
         }

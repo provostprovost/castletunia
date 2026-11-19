@@ -395,10 +395,12 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     int32_t pl = render_perc_voice(&g_perc[0], &z->perc_low);
     int32_t ph = render_perc_voice(&g_perc[1], &z->perc_high);
 
-    /* Stereo mix: Party leads forward, Backing Chords & Percussion supportive */
+    /* Stereo mix: Party leads forward, Backing Chords & Percussion ducked 50% while playing keys */
     int32_t p_mix = (pl >> 1) + ((ph * 3) >> 3);
-    int32_t dry_l = ((drone * 3) >> 2) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
-    int32_t dry_r = ((drone * 3) >> 2) + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1) + p_mix;
+    int32_t bg_mix = ((drone * 3) >> 2) + p_mix;
+    if (g_state.capture.active) bg_mix >>= 1;
+    int32_t dry_l = bg_mix + v0 + (v0 >> 2) + v1 + (v1 >> 2) + v2 + (vt >> 1);
+    int32_t dry_r = dry_l;
 
     /* 4. Schroeder 4-Comb + 2-Allpass Room Reverb */
     int32_t rev_in = (dry_l + dry_r) >> 2;
