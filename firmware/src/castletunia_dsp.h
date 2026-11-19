@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#ifndef FANTASIA_DSP_H
-#define FANTASIA_DSP_H
+#ifndef CASTLETUNIA_DSP_H
+#define CASTLETUNIA_DSP_H
 
 #include <stdint.h>
-#include "fantasia_types.h"
+#include "castletunia_types.h"
 
 void dsp_init(void);
 void dsp_drone_set(uint8_t root_midi, uint8_t third_midi, uint8_t fifth_midi, uint8_t third_en, uint8_t fifth_en, uint8_t level);
@@ -18,4 +18,4 @@ void dsp_all_notes_off(void);
 void dsp_tick_gates(void);
 void dsp_render_sample(int32_t *out_l, int32_t *out_r);
 
-#endif /* FANTASIA_DSP_H */
+#endif /* CASTLETUNIA_DSP_H */

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#ifndef FANTASIA_TYPES_H
-#define FANTASIA_TYPES_H
+#ifndef CASTLETUNIA_TYPES_H
+#define CASTLETUNIA_TYPES_H
 
 #include <stdint.h>
 #include "app_config.h"
@@ -70,7 +70,7 @@ typedef struct {
     uint8_t  mix_slots[NUM_PARTY_SLOTS]; /* 0..127 */
     uint8_t  mix_perc;                   /* 0..127 */
     uint8_t  reverb_override;            /* 0..127 (0 = use Zone default) */
-} FantasiaSettings;
+} CastletuniaSettings;
 
 typedef struct {
     uint8_t  magic;                      /* SETTINGS_MAGIC (0xFA) */
@@ -88,7 +88,7 @@ typedef struct {
     uint8_t  mix_perc;                   /* 0..127 */
     uint8_t  reverb_override;            /* 0..127 */
     SeedSlot saved_slots[NUM_PARTY_SLOTS];
-} FantasiaSaveBlob;
+} CastletuniaSaveBlob;
 
 typedef struct {
     const char *name;
@@ -126,7 +126,7 @@ typedef struct {
     uint8_t           cross_accent_bars[NUM_PARTY_SLOTS];
     CaptureBuf        capture;
     SpellState        spells;
-    FantasiaSaveBlob  settings;
+    CastletuniaSaveBlob  settings;
     uint8_t           next_slot;
     uint8_t           ui_dirty;
     uint8_t           cpu_load_pct;
@@ -165,6 +165,6 @@ typedef struct {
     uint8_t           boss_curse_bars;
     uint8_t           boss_buildup_steps;
     NoteProjectile    note_fx[MAX_SEED_NOTES];
-} FantasiaState;
+} CastletuniaState;
 
-#endif /* FANTASIA_TYPES_H */
+#endif /* CASTLETUNIA_TYPES_H */

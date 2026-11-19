@@ -1,4 +1,4 @@
-# Fantasia host test script: Seed planting, Zone switching, Spells & Freeze
+# Castletunia host test script: Seed planting, Zone switching, Spells & Freeze
 200 keys 1
 350 keys 0
 500 keys 16

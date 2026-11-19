@@ -1,14 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Fantasia: Generative Dungeon-Synth & 16-bit RPG Soundtrack Firmware for M-VAVE FM-1
+/* Castletunia: Generative Dungeon-Synth & 16-bit RPG Soundtrack Firmware for M-VAVE FM-1
  * Built on zvenson/dinghy v0.5 (GPL-3.0-only). */
 
 #include "app_config.h"
 
-#define APP_NAME    "FANTASIA"
+#define APP_NAME    "CASTLETUNIA"
 #ifndef FELUCCA_ID
 #define FELUCCA_ID  "FM-1_961"
 #endif
-#define STORE_MAGIC FANTASIA_STORE_MAGIC
+#define STORE_MAGIC CASTLETUNIA_STORE_MAGIC
 
 static void app_idle(void);
 #define LCD_IDLE app_idle
@@ -18,19 +18,19 @@ static void app_idle(void);
 #endif
 
 #include "hal_adapter.h"
-#include "fantasia_types.h"
-#include "fantasia_zones.h"
-#include "fantasia_engine.h"
-#include "fantasia_dsp.h"
-#include "fantasia_input.h"
-#include "fantasia_assets.h"
-#include "fantasia_ui.h"
+#include "castletunia_types.h"
+#include "castletunia_zones.h"
+#include "castletunia_engine.h"
+#include "castletunia_dsp.h"
+#include "castletunia_input.h"
+#include "castletunia_assets.h"
+#include "castletunia_ui.h"
 
-#include "fantasia_zones.c"
-#include "fantasia_engine.c"
-#include "fantasia_dsp.c"
-#include "fantasia_input.c"
-#include "fantasia_ui.c"
+#include "castletunia_zones.c"
+#include "castletunia_engine.c"
+#include "castletunia_dsp.c"
+#include "castletunia_input.c"
+#include "castletunia_ui.c"
 
 static uint32_t g_sample_acc = 0u;
 static uint8_t  g_idle_ok = 0u;
@@ -69,7 +69,7 @@ static void app_main(void)
 {
     dsp_init();
     engine_init_defaults();
-    if (hal_settings_load(&g_state.settings, sizeof(FantasiaSaveBlob)) == 0 &&
+    if (hal_settings_load(&g_state.settings, sizeof(CastletuniaSaveBlob)) == 0 &&
         g_state.settings.magic == SETTINGS_MAGIC) {
         /* Restore zone/BPM/knobs cleanly; keep Party slots empty on boot until user plays */
         const ZoneDef *z = zone_get(g_state.settings.zone_id);

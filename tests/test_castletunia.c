@@ -21,13 +21,13 @@ uint64_t mock_leds = 0;
 uint64_t mock_glow = 0;
 uint8_t  mock_flash_blob[512];
 uint32_t mock_flash_len = 0;
-#include "fantasia_types.h"
-#include "fantasia_zones.h"
-#include "fantasia_engine.h"
-#include "fantasia_dsp.h"
+#include "castletunia_types.h"
+#include "castletunia_zones.h"
+#include "castletunia_engine.h"
+#include "castletunia_dsp.h"
 
 #if TEST_STAGE == 1
-/* Test spies for Stage 1 (engine-only without fantasia_dsp.c) */
+/* Test spies for Stage 1 (engine-only without castletunia_dsp.c) */
 static uint32_t spy_note_count = 0;
 static uint8_t  spy_last_slot = 0;
 static uint8_t  spy_last_midi = 0;
@@ -54,8 +54,8 @@ void dsp_render_sample(int32_t *l, int32_t *r) { *l = 0; *r = 0; }
 #endif
 
 #if TEST_STAGE == 3
-#include "fantasia_assets.h"
-#include "fantasia_ui.h"
+#include "castletunia_assets.h"
+#include "castletunia_ui.h"
 void dsp_init(void) {}
 void dsp_drone_set(uint8_t r, uint8_t t, uint8_t f, uint8_t te, uint8_t fe, uint8_t lvl) { (void)r; (void)t; (void)f; (void)te; (void)fe; (void)lvl; }
 void dsp_note_on(uint8_t slot, uint8_t midi, uint16_t vel, uint16_t gate) { (void)slot; (void)midi; (void)vel; (void)gate; }
@@ -71,9 +71,9 @@ void dsp_render_sample(int32_t *l, int32_t *r) { *l = 0; *r = 0; }
 #endif
 
 #if TEST_STAGE == 4
-#include "fantasia_assets.h"
-#include "fantasia_ui.h"
-#include "fantasia_input.h"
+#include "castletunia_assets.h"
+#include "castletunia_ui.h"
+#include "castletunia_input.h"
 #endif
 
 #if TEST_STAGE == 1
@@ -198,7 +198,7 @@ static void run_stage2(void)
     engine_init_defaults();
     g_state.settings.intensity = 100;
 
-    FILE *wav = fopen("build/test_fantasia.wav", "wb");
+    FILE *wav = fopen("build/test_castletunia.wav", "wb");
     assert(wav != NULL);
     uint32_t total_frames = 1000u * 256u;
     write_wav_header(wav, total_frames);
@@ -281,8 +281,8 @@ static void save_ppm(const char *path, const uint16_t *fb)
 static void run_stage3(void)
 {
     printf("=== Stage 3: Dual-Path Asset Generator & Differential SNES UI ===\n");
-    printf("sizeof(fantasia_assets) = %zu bytes\n", sizeof(fantasia_assets));
-    assert(sizeof(fantasia_assets) < 200000u);
+    printf("sizeof(castletunia_assets) = %zu bytes\n", sizeof(castletunia_assets));
+    assert(sizeof(castletunia_assets) < 200000u);
 
     engine_init_defaults();
     ui_init();
@@ -337,7 +337,7 @@ static void run_stage4(void)
     g_state.settings.zone_id = 3;
     mock_btn_press = (1u << BTN_SAVE);
     input_process();
-    FantasiaSaveBlob loaded;
+    CastletuniaSaveBlob loaded;
     assert(hal_settings_load(&loaded, sizeof(loaded)) == 0);
     assert(loaded.zone_id == 3);
 

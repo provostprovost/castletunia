@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#include "fantasia_engine.h"
-#include "fantasia_zones.h"
-#include "fantasia_dsp.h"
+#include "castletunia_engine.h"
+#include "castletunia_zones.h"
+#include "castletunia_dsp.h"
 #include "hal_adapter.h"
 
-FantasiaState g_state;
+CastletuniaState g_state;
 
 static void copy_str(char *dst, const char *src, uint32_t max_len)
 {

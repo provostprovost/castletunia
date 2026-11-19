@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#ifndef FANTASIA_ENGINE_H
-#define FANTASIA_ENGINE_H
+#ifndef CASTLETUNIA_ENGINE_H
+#define CASTLETUNIA_ENGINE_H
 
-#include "fantasia_types.h"
+#include "castletunia_types.h"
 
-extern FantasiaState g_state;
+extern CastletuniaState g_state;
 
 uint32_t engine_prng(void);
 void engine_init_defaults(void);
@@ -33,4 +33,4 @@ void engine_spell_toll(void);
 
 void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held);
 
-#endif /* FANTASIA_ENGINE_H */
+#endif /* CASTLETUNIA_ENGINE_H */

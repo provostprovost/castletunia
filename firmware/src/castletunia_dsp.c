@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#include "fantasia_dsp.h"
-#include "fantasia_zones.h"
-#include "fantasia_engine.h"
+#include "castletunia_dsp.h"
+#include "castletunia_zones.h"
+#include "castletunia_engine.h"
 #include "hal_adapter.h"
 
 static const uint32_t G_MIDI_PHASE_INC[128] = {

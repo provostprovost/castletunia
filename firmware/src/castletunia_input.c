@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#include "fantasia_input.h"
-#include "fantasia_engine.h"
-#include "fantasia_dsp.h"
+#include "castletunia_input.h"
+#include "castletunia_engine.h"
+#include "castletunia_dsp.h"
 #include "hal_adapter.h"
 
 static uint32_t g_prev_notes = 0u;
@@ -111,7 +111,7 @@ void input_process(void)
         for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
             g_state.settings.saved_slots[s] = g_state.slots[s];
         }
-        hal_settings_save(&g_state.settings, sizeof(FantasiaSaveBlob));
+        hal_settings_save(&g_state.settings, sizeof(CastletuniaSaveBlob));
         engine_set_ticker("> SAVED TO TOME!");
     }
 

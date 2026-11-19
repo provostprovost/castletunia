@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#include "fantasia_zones.h"
+#include "castletunia_zones.h"
 
 const ZoneDef G_ZONES[NUM_ZONES] = {
     /* Zone 0: THE CRYPT - Classic Dark DS */

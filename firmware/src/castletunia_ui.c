@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-#include "fantasia_ui.h"
-#include "fantasia_engine.h"
-#include "fantasia_zones.h"
-#include "fantasia_assets.h"
+#include "castletunia_ui.h"
+#include "castletunia_engine.h"
+#include "castletunia_zones.h"
+#include "castletunia_assets.h"
 #include "hal_adapter.h"
 
 #define DIORAMA_W 120
@@ -47,9 +47,9 @@ static uint16_t sample_diorama_px(uint8_t zone_id, int sx, int sy, uint8_t mirro
     if (mirror) sx = (DIORAMA_W - 1) - sx;
 
     uint32_t idx = (uint32_t)sy * DIORAMA_W + (uint32_t)sx;
-    uint8_t packed = fantasia_assets.zone_maps[zone_id % 9u][idx >> 1];
+    uint8_t packed = castletunia_assets.zone_maps[zone_id % 9u][idx >> 1];
     uint8_t pal_idx = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
-    return fantasia_assets.zone_pals[zone_id % 9u][pal_idx];
+    return castletunia_assets.zone_pals[zone_id % 9u][pal_idx];
 }
 
 static int boss_hover_dy(uint8_t phase)
@@ -123,15 +123,15 @@ static void render_battle_sprites(void)
                 if (b_x >= 0 && b_x < 96 && b_y >= 0 && b_y < 96) {
                     int b_sx = mirror ? (95 - b_x) : b_x;
                     uint32_t idx = (uint32_t)b_y * 96u + (uint32_t)b_sx;
-                    uint8_t packed = fantasia_assets.boss_sprites[z][idx >> 1];
+                    uint8_t packed = castletunia_assets.boss_sprites[z][idx >> 1];
                     uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                     if (ci != 0u) {
                         if (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u) {
                             bg = 0xFFFFu;
                         } else if (g_state.boss_atk_timer > 18u && (g_state.boss_atk_timer & 2u)) {
-                            bg = fantasia_assets.boss_pals[z][ci] ^ 0x39E7u;
+                            bg = castletunia_assets.boss_pals[z][ci] ^ 0x39E7u;
                         } else {
-                            bg = fantasia_assets.boss_pals[z][ci];
+                            bg = castletunia_assets.boss_pals[z][ci];
                         }
                     }
                 }
@@ -158,12 +158,12 @@ static void render_battle_sprites(void)
         uint8_t atk_t = g_state.attack_timer[s];
         const uint16_t *pal = g_state.slots[s].frozen
                             ? G_FREEZE_PALETTE
-                            : (atk_t > 0u ? fantasia_assets.party_atk_pals[s] : fantasia_assets.party_pals[s]);
-        const uint8_t *spr = fantasia_assets.party_sprites[s];
+                            : (atk_t > 0u ? castletunia_assets.party_atk_pals[s] : castletunia_assets.party_pals[s]);
+        const uint8_t *spr = castletunia_assets.party_sprites[s];
         int lunge = 0;
         if (atk_t > 0u) {
             uint8_t frame = (atk_t > 10u) ? 0u : ((atk_t > 5u) ? 1u : 2u);
-            spr = fantasia_assets.party_atk[s][frame];
+            spr = castletunia_assets.party_atk[s][frame];
             lunge = (frame == 0u) ? -10 : ((frame == 1u) ? -28 : -16);
         } else if (party_recoil > 0) {
             lunge = party_recoil;
@@ -270,7 +270,7 @@ static void render_particles(void)
 {
     uint8_t z = g_state.settings.zone_id;
     uint8_t mirror = g_state.spells.mirror_active;
-    uint16_t pcol = fantasia_assets.zone_pals[z % 9u][14];
+    uint16_t pcol = castletunia_assets.zone_pals[z % 9u][14];
     for (int i = 0; i < NUM_PARTICLES; i++) {
         restore_diorama_4x4(z, g_particles[i].x, g_particles[i].y, mirror);
         g_particles[i].x += g_particles[i].vx;
@@ -338,9 +338,9 @@ static void render_party_row(uint8_t s, int row_y)
             uint16_t col = bg;
             if (g_state.next_slot == s) {
                 uint32_t idx = (uint32_t)j * 16u + (uint32_t)i;
-                uint8_t packed = fantasia_assets.cursor_sprite[idx >> 1];
+                uint8_t packed = castletunia_assets.cursor_sprite[idx >> 1];
                 uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
-                if (ci != 0u) col = fantasia_assets.sprite_pal[ci];
+                if (ci != 0u) col = castletunia_assets.sprite_pal[ci];
             }
             g_sprite_buf[j * 16 + i] = col;
         }
@@ -421,8 +421,8 @@ void ui_render_splash(void)
     for (int y = 0; y < 240; y++) {
         uint32_t row_off = (uint32_t)y * 240u;
         for (int x = 0; x < 240; x++) {
-            uint8_t ci = fantasia_assets.splash_data[row_off + (uint32_t)x];
-            g_scanline[x] = fantasia_assets.splash_pal[ci];
+            uint8_t ci = castletunia_assets.splash_data[row_off + (uint32_t)x];
+            g_scanline[x] = castletunia_assets.splash_pal[ci];
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
     }

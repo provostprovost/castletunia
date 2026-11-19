@@ -7,7 +7,7 @@
 #define NUM_PARTY_SLOTS   3u
 #define NUM_ZONES         9u
 #define SETTINGS_MAGIC    0xFAu
-#define FANTASIA_STORE_MAGIC 0x544E4146u /* "FANT" */
+#define CASTLETUNIA_STORE_MAGIC 0x544E4146u /* "FANT" */
 #define UI_REDRAW_MS      33u
 #define BTN_HOLD_MS       600u
 
