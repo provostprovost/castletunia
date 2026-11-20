@@ -12,11 +12,11 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 - **6 Tactile Spells & Zero-Menu Macro Controls:** Cast **Haste (`1.5×`)**, **Mirror** (flips Party & Boss + reverses step order), **Shatter** (crystalline SFX + pattern fracture), **Resolve** (`V → I` cadence), and **Toll** (zone boss bell), plus 7 one-knob-per-function encoders (`Intensity`, `Drift`, `Density`, `Harmony`, `Weave`, `BPM`).
 - **`240×240` 256-Color Boot Splash & Live Battle HUD:** Boots into a skippable 3-second pixel-art splash screen, then displays the live animated battle scene, per-character activity meters, status badges (`FRZ` / `HST` / `RDY`), and beat-synced battle ticker.
 
-| Boot Splash | 0 · The Crypt | 1 · The Tavern | 2 · The Tundra | 3 · The Sands |
+| Boot Splash | 1 · The Crypt | 2 · The Tavern | 3 · The Tundra | 4 · The Sands |
 |---|---|---|---|---|
 | ![Boot Splash](assets/screenshots/splash.png) | ![The Crypt](assets/screenshots/zone_0_crypt.png) | ![The Tavern](assets/screenshots/zone_1_tavern.png) | ![The Tundra](assets/screenshots/zone_2_tundra.png) | ![The Sands](assets/screenshots/zone_3_sands.png) |
 
-| 4 · The Glade | 5 · The Castle | 6 · Coronation | 7 · The Spire | 8 · Boss |
+| 5 · The Glade | 6 · The Castle | 7 · Coronation | 8 · The Spire | 9 · Boss |
 |---|---|---|---|---|
 | ![The Glade](assets/screenshots/zone_4_glade.png) | ![The Castle](assets/screenshots/zone_5_castle.png) | ![Coronation](assets/screenshots/zone_6_coronation.png) | ![The Spire](assets/screenshots/zone_7_spire.png) | ![Boss](assets/screenshots/zone_8_boss.png) |
 
@@ -101,15 +101,15 @@ When all 3 Party members are active, each Boss counts player turns according to 
 
 | # | Stage | Scale & BPM | Boss | Cooldown | 1-Bar Curse & Visual FX |
 |---|---|---|---|---|---|
-| **0** | **`THE CRYPT`** | Aeolian · `92 BPM` | **Lich** | 4 turns | `> LICH: DOOM!` · Purple ripple, cathedral reverb surge, sub-octave drop (`-7`), `bII` chord |
-| **1** | **`THE TAVERN`** | Mixolydian · `104 BPM` | **Mimic** | 4 turns | `> MIMIC: BRAWL!` · Amber ripple, wild swing (`58%`), battle drum fills (`95%`), FM grit |
-| **2** | **`THE TUNDRA`** | Aeolian · `60 BPM` | **Wyrm** | 4 turns | `> WYRM: BLIZZARD!` · Ice ripple, cathedral reverb surge, `+1` octave shimmer (`+7`) |
-| **3** | **`THE SANDS`** | Phrygian Dom. · `100 BPM` | **Anubis** | 3 turns | `> ANUBIS: SANDSTORM!` · Gold ripple, `bII` Phrygian tension chord, battle drum fills (`95%`) |
-| **4** | **`THE GLADE`** | Dorian · `82 BPM` | **Treant** | 5 turns | `> TREANT: OVERGROW!` · Emerald ripple, `100%` density + lush arpeggio cascades (`{2, 4, 7}`) |
-| **5** | **`THE CASTLE`** | Harmonic Min. · `90 BPM` | **Vampire** | 3 turns | `> VAMPIRE: BLOOD MOON!` · Crimson ripple, temporary `Mirror` inversion, FM grit |
-| **6** | **`CORONATION`** | Ionian · `104 BPM` | **Seraph** | 4 turns | `> SERAPH: JUDGMENT!` · Gold ripple, `IV → V` fanfare cadence, `100%` density, snare fills |
-| **7** | **`THE SPIRE`** | Lydian · `68 BPM` | **Beholder** | 4 turns | `> BEHOLDER: WARP!` · Cyan ripple, `1.5×` Haste, reverb surge, `+1` octave shimmer (`+7`) |
-| **8** | **`BOSS`** | Locrian · `138 BPM` | **Demon** | 5 turns | `> DEMON: METEOR!` · Magenta ripple, `bII` chord, `1.5×` Haste, `100%` density, battle drums, FM grit |
+| **1** | **`THE CRYPT`** | Aeolian · `92 BPM` | **Lich** | 4 turns | `> LICH: DOOM!` · Purple ripple, cathedral reverb surge, sub-octave drop (`-7`), `bII` chord |
+| **2** | **`THE TAVERN`** | Mixolydian · `104 BPM` | **Mimic** | 4 turns | `> MIMIC: BRAWL!` · Amber ripple, wild swing (`58%`), battle drum fills (`95%`), FM grit |
+| **3** | **`THE TUNDRA`** | Aeolian · `60 BPM` | **Wyrm** | 4 turns | `> WYRM: BLIZZARD!` · Ice ripple, cathedral reverb surge, `+1` octave shimmer (`+7`) |
+| **4** | **`THE SANDS`** | Phrygian Dom. · `100 BPM` | **Anubis** | 3 turns | `> ANUBIS: SANDSTORM!` · Gold ripple, `bII` Phrygian tension chord, battle drum fills (`95%`) |
+| **5** | **`THE GLADE`** | Dorian · `82 BPM` | **Treant** | 5 turns | `> TREANT: OVERGROW!` · Emerald ripple, `100%` density + lush arpeggio cascades (`{2, 4, 7}`) |
+| **6** | **`THE CASTLE`** | Harmonic Min. · `90 BPM` | **Vampire** | 3 turns | `> VAMPIRE: BLOOD MOON!` · Crimson ripple, temporary `Mirror` inversion, FM grit |
+| **7** | **`CORONATION`** | Ionian · `104 BPM` | **Seraph** | 4 turns | `> SERAPH: JUDGMENT!` · Gold ripple, `IV → V` fanfare cadence, `100%` density, snare fills |
+| **8** | **`THE SPIRE`** | Lydian · `68 BPM` | **Beholder** | 4 turns | `> BEHOLDER: WARP!` · Cyan ripple, `1.5×` Haste, reverb surge, `+1` octave shimmer (`+7`) |
+| **9** | **`BOSS`** | Locrian · `138 BPM` | **Demon** | 5 turns | `> DEMON: METEOR!` · Magenta ripple, `bII` chord, `1.5×` Haste, `100%` density, battle drums, FM grit |
 
 ---
 
