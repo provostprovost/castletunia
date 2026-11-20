@@ -275,7 +275,9 @@ static void apply_drift_to_slot(SeedSlot *sl, uint8_t drift)
 {
     if (sl->frozen || sl->note_count == 0u) return;
     uint32_t r = engine_prng();
-    uint8_t idx = (uint8_t)(r % sl->note_count);
+    uint8_t idx = (sl->note_count > 1u && drift <= 60u)
+                ? (uint8_t)(1u + (r % (sl->note_count - 1u)))
+                : (uint8_t)(r % sl->note_count);
     int32_t deg = sl->scale_deg[idx];
     if (deg < 0) deg = (int32_t)(g_state.active_chord_deg % 7u);
 
@@ -305,7 +307,7 @@ static void apply_drift_to_slot(SeedSlot *sl, uint8_t drift)
     }
 
     if (deg < 0) deg = 0;
-    if (deg > 21) deg = 14 + (deg % 7);
+    if (deg > 26) deg = 19 + (deg % 7);
     sl->scale_deg[idx] = (int8_t)deg;
 }
 
@@ -347,13 +349,13 @@ void seed_commit_capture(void)
         if (count == 1u) {
             step = 0u;
         } else if (span < 24u) {
-            /* Rapid phrase: place cleanly on consecutive 8th/16th steps */
+            /* Rapid phrase: consecutive 8th/16th steps */
             step = ((uint32_t)i * ((count <= 4u) ? 2u : 1u)) % 16u;
         } else {
-            /* Snap to nearest 16th-note (6 ticks = 1/4 beat, preserving beats & half-beats) */
+            /* Quantize to 16ths so intentional 16th patterns survive */
             step = ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
         }
-        /* Nudge collisions to the next free 16th (+1) instead of jumping +3 */
+        /* Nudge collisions to the next free 16th (+1) */
         for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
             step = (step + 1u) % 16u;
         }
@@ -361,6 +363,24 @@ void seed_commit_capture(void)
         if (step > max_step) max_step = step;
         ns.scale_deg[i] = (int8_t)g_state.capture.scale_deg[i];
         ns.step_pos[i] = (uint8_t)step;
+    }
+
+    /* Anchor pass: any isolated 16th (e or a) with no 1 or & in that beat snaps to the nearest 8th */
+    for (uint8_t i = 0; i < count; i++) {
+        uint8_t st = ns.step_pos[i];
+        if ((st & 1u) != 0u) {
+            uint8_t beat_base = (uint8_t)(st & ~3u);
+            uint8_t has_anchor = ((used_steps & (1u << beat_base)) != 0u) ||
+                                 ((used_steps & (1u << (beat_base + 2u))) != 0u);
+            if (!has_anchor) {
+                uint8_t target = (uint8_t)(beat_base + (((st & 3u) == 3u) ? 2u : 0u));
+                if ((used_steps & (1u << target)) == 0u) {
+                    used_steps &= (uint16_t)~(1u << st);
+                    used_steps |= (uint16_t)(1u << target);
+                    ns.step_pos[i] = target;
+                }
+            }
+        }
     }
 
     ns.note_count = count;
@@ -702,6 +722,8 @@ void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
     }
 }
 
+static int8_t g_step_deg[NUM_PARTY_SLOTS] = {-1, -1, -1};
+
 static void trigger_slot_step(uint8_t s, uint8_t step)
 {
     SeedSlot *sl = &g_state.slots[s];
@@ -780,10 +802,23 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 break;
             }
         }
-        /* Density blooming (65..100%) adds gentle stepwise passing tones (or lush Overgrow cascades for Treant) */
+        /* Density blooming (65..100%) adds passing tones on beats/8ths, or 16ths only when anchored to that beat */
         if (deg < 0 && eff_density >= 65u) {
+            uint8_t allow_bloom = ((pos & 1u) == 0u) || (boss_active && zc == 2u);
+            if (!allow_bloom) {
+                /* Odd 16th (e or a): only allow if this beat already has an anchor on 1 or & */
+                uint8_t beat_base = (uint8_t)(pos & ~3u);
+                for (uint8_t i = 0; i < sl->note_count; i++) {
+                    uint8_t tp = sl->step_pos[i] % len;
+                    if (eff_mirror) tp = (uint8_t)((len - 1u - tp) % len);
+                    if (tp == beat_base || tp == (uint8_t)(beat_base + 2u)) {
+                        allow_bloom = 1u;
+                        break;
+                    }
+                }
+            }
             uint8_t chance = (boss_active && zc == 2u) ? 55u : (uint8_t)(eff_density - 58u);
-            if ((engine_prng() % 100u) < chance) {
+            if (allow_bloom && (engine_prng() % 100u) < chance) {
                 static const int8_t ORN[3] = {1, -1, 2};
                 static const int8_t OVERGROW[3] = {2, 4, 7};
                 int8_t base = sl->scale_deg[0];
@@ -807,7 +842,7 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             if (step == 0u) {
                 deg = c_root;
             } else if (g_state.settings.harmony >= 15u) {
-                static const int8_t BASS_WALK[4] = {0, 4, 2, 6};
+                static const int8_t BASS_WALK[4] = {0, 4, 2, 4};
                 uint8_t w_idx = (uint8_t)(((step >> 2) + form_bar) & 3u);
                 deg = c_root + BASS_WALK[w_idx];
             }
@@ -865,6 +900,27 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
         vel_pct = 120u;
         if ((engine_prng() % 100u) < 35u) deg += 7;
     }
+
+    /* Harmonic & Contrapuntal Weave (Weave >= 35%): voices avoid unison/2nd clashes and interlock */
+    if (g_state.settings.weave >= 35u) {
+        for (uint8_t other = 0u; other < NUM_PARTY_SLOTS; other++) {
+            if (other == s || g_step_deg[other] < 0) continue;
+            int32_t d = (deg - (int32_t)g_step_deg[other]) % 7;
+            if (d < 0) d += 7;
+            if (d == 0 || d == 1 || d == 6) {
+                /* Shift Fighter down/5th or Cleric up a 3rd/5th to weave clean harmony */
+                deg += (s == 0u) ? -3 : 2;
+                if (deg < 0) deg += 7;
+                if (deg > 26) deg -= 7;
+            }
+        }
+        /* Contrapuntal breathing: if Weave >= 55% and both Sorceress & Fighter hit this step, Cleric ducks slightly */
+        if (s == 1u && g_state.settings.weave >= 55u && g_step_deg[2] >= 0 && g_step_deg[0] >= 0) {
+            vel_pct = (uint8_t)((vel_pct * 75u) / 100u);
+        }
+    }
+
+    g_step_deg[s] = (int8_t)(deg % 7);
 
     uint8_t midi = engine_note_for_degree(deg, s);
     uint32_t vel_q15 = ((uint32_t)g_state.settings.mix_slots[s] * 256u * vel_pct) / 100u;
@@ -926,29 +982,12 @@ void engine_tick_ppqn(void)
     uint8_t t = g_state.tick_in_16th;
     uint8_t step = g_state.step_16th;
 
-    /* Swing calculation for Weave 21..60% (or Barrel Mimic Boss Brawl) */
-    uint8_t swing_ticks = 0u;
-    uint8_t eff_weave = (g_state.boss_curse_bars > 0u && (zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 1u)
-                      ? 58u : g_state.settings.weave;
-    if (eff_weave >= 15u && eff_weave <= 65u) {
-        swing_ticks = (uint8_t)(1u + (eff_weave - 15u) / 15u);
-        if (swing_ticks > 3u) swing_ticks = 3u;
-    }
     uint8_t eff_haste = g_state.spells.haste_active ||
                         (g_state.boss_curse_bars > 0u && ((zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 5u || (zone_get(g_state.settings.zone_id)->subgenre_id % 9u) == 8u));
 
-    uint8_t fire_main = 0u;
+    uint8_t fire_main = (t == 0u);
     uint8_t pair_tick = (uint8_t)((step & 1u) * 6u + t);
     uint8_t fire_haste = (pair_tick == 0u || pair_tick == 4u || pair_tick == 8u); /* 1.5x tempo */
-    if (swing_ticks == 0u) {
-        fire_main = (t == 0u);
-    } else {
-        if ((step & 1u) == 0u) {
-            fire_main = (t == 0u);
-        } else {
-            fire_main = (t == swing_ticks);
-        }
-    }
 
     if (fire_main) {
         /* Update active chord degree & retune Drone on chord changes */
@@ -978,11 +1017,14 @@ void engine_tick_ppqn(void)
             if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
         }
 
-        /* Slot 0 always at 1x */
+        /* Trigger Sorceress (Lead) -> Fighter (Bass) -> Cleric (Weaves harmony between both) */
+        g_step_deg[0] = -1; g_step_deg[1] = -1; g_step_deg[2] = -1;
+        if (!eff_haste) {
+            trigger_slot_step(2u, step);
+        }
         trigger_slot_step(0u, step);
         if (!eff_haste) {
             trigger_slot_step(1u, step);
-            trigger_slot_step(2u, step);
         }
 
         /* Percussion evaluation (sensitive to Intensity, Density, and Boss Counter-Attack) */

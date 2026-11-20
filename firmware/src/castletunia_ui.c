@@ -435,7 +435,7 @@ void ui_render_splash(void)
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
     }
-    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.0.1", 0xFE60u, 0x0021u, 1);
+    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.0.2", 0xFE60u, 0x0021u, 1);
 }
 
 void ui_init(void)

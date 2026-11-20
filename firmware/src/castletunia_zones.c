@@ -64,11 +64,11 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
             {2, 1,  8000,     0, 950, 32720, 26000, 32500}  /* Tundra Sorceress: pure frost whistle */
         },
         .perc_low  = { 750,  150, 32300,  1200, 1,  4000, 32757},
-        .perc_high = {4500, 2200, 27500, 29000, 4, 18000, 32742},
+        .perc_high = {3200, 1600, 27500, 18000, 4, 18000, 32735},
         .low_mask_march  = 0x0001u,
-        .high_mask_march = 0x0404u,
+        .high_mask_march = 0x1000u,
         .low_mask_battle = 0x0101u,
-        .high_mask_battle= 0x2424u,
+        .high_mask_battle= 0x1010u,
         .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740}
     },
     /* Zone 4: THE SANDS - Desert / Tomb */
@@ -88,10 +88,10 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         },
         .perc_low  = {1200,  400, 31000,  3000, 2, 10000, 32753},
         .perc_high = {3500, 1800, 28500, 22000, 3, 10000, 32726},
-        .low_mask_march  = 0x0841u,
-        .high_mask_march = 0x2222u,
-        .low_mask_battle = 0x4849u,
-        .high_mask_battle= 0xB6B6u,
+        .low_mask_march  = 0x0141u,
+        .high_mask_march = 0x1010u,
+        .low_mask_battle = 0x0541u,
+        .high_mask_battle= 0x5454u,
         .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740}
     },
     /* Zone 2: THE GLADE - Woodland Synth */
@@ -124,7 +124,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .default_bpm = 90,
         .scale_semitones = {0, 2, 3, 5, 7, 8, 11},
         .mid_prog = {0, 5, 3, 4},
-        .high_prog = {0, 5, 1, 4},
+        .high_prog = {0, 3, 6, 4},
         .reverb_mix = 84,
         .reverb_fb = 25800,
         .party_patches = {
@@ -169,7 +169,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .subgenre_id = 5,
         .default_bpm = 68,
         .scale_semitones = {0, 2, 4, 6, 7, 9, 11},
-        .mid_prog = {0, 1, 5, 0},
+        .mid_prog = {0, 1, 4, 0},
         .high_prog = {0, 1, 4, 5},
         .reverb_mix = 110,
         .reverb_fb = 27600,
@@ -181,9 +181,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .perc_low  = { 700,  100, 32500,   500, 1,  2000, 32760},
         .perc_high = {5000, 3000, 27000, 18000, 5, 20000, 32745},
         .low_mask_march  = 0x0101u,
-        .high_mask_march = 0x0808u,
-        .low_mask_battle = 0x0909u,
-        .high_mask_battle= 0x4949u,
+        .high_mask_march = 0x1010u,
+        .low_mask_battle = 0x1111u,
+        .high_mask_battle= 0x4444u,
         .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740}
     },
     /* Zone 8: BOSS - 16-Bit Battle */
