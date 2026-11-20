@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Castletunia — Web Installer for M-VAVE FM-1</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #181c26;
+    --border: #2a3142;
+    --accent: #f59e0b;
+    --accent-dim: #b45309;
+    --cyan: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    padding: 32px 16px 64px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 28px; }
+  h1 { margin: 0 0 8px; font-size: 2.1rem; color: var(--accent); letter-spacing: 0.5px; }
+  .sub { color: var(--muted); margin: 0; font-size: 1.05rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .warn {
+    border-left: 4px solid var(--accent);
+    background: rgba(245, 158, 11, 0.08);
+    padding: 12px 14px;
+    border-radius: 6px;
+    font-size: 0.93rem;
+    margin-bottom: 18px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  button {
+    background: var(--accent);
+    color: #111;
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: #fbbf24; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-sec {
+    background: #262d3d;
+    color: var(--text);
+    font-weight: 600;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  .btn-sec:hover:not(:disabled) { background: #333c52; }
+  .progress-wrap {
+    margin-top: 16px;
+    background: #0b0e14;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 18px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    transition: width 0.12s linear;
+  }
+  .status { margin-top: 10px; font-weight: 600; color: var(--cyan); min-height: 1.4em; }
+  .status.err { color: var(--red); }
+  .status.ok { color: var(--green); }
+  .log {
+    margin-top: 12px;
+    background: #0b0e14;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    color: var(--muted);
+    max-height: 180px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .grid figure {
+    margin: 0;
+    text-align: center;
+  }
+  .grid img {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    image-rendering: pixelated;
+    display: block;
+  }
+  .grid figcaption {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  a { color: var(--cyan); }
+  code { background: #0b0e14; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  ol { margin: 8px 0 0 18px; padding: 0; }
+  li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Castletunia</h1>
+    <p class="sub">Generative Dungeon-Synth &amp; 16-Bit RPG Battle Soundtrack Firmware for M-VAVE FM-1</p>
+  </header>
+
+  <div class="card">
+    <div class="warn">
+      <strong>Before you flash:</strong> Use <strong>Chrome, Edge, or Opera</strong> on desktop (WebMIDI with SysEx is required; Safari/Firefox do not support WebMIDI). Connect your <strong>M-VAVE FM-1</strong> with a USB-C data cable and power it on. Back up any stock patterns you want to keep first.<br><br>
+      <strong>Disclaimer:</strong> Flashing custom firmware is at your own risk. This software is provided as-is without warranty, and the author is not responsible if flashing or using it damages or bricks your device.
+    </div>
+
+    <div class="row">
+      <button id="installBtn">Connect &amp; Install Castletunia</button>
+      <a class="btn-sec" href="https://joakimeriksson.github.io/fm1-emu/?package=https://provostprovost.github.io/castletunia/castletunia.fwsc&amp;name=CASTLETUNIA&amp;mhz=60" target="_blank" rel="noopener" style="text-decoration:none; display:inline-block;">&#9654; Play in Browser</a>
+      <label class="btn-sec" style="cursor:pointer; display:inline-block;">
+        Use Custom .fwsc
+        <input id="fileInput" type="file" accept=".fwsc" style="display:none">
+      </label>
+      <span id="pkgLabel" style="color:var(--muted); font-size:0.9rem;">Package: <code>castletunia.fwsc</code> (v1.0, FM-1)</span>
+    </div>
+
+    <div class="progress-wrap"><div class="progress-bar" id="bar"></div></div>
+    <div class="status" id="status">Ready. Plug in your FM-1 and click Install.</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0; color:var(--accent);">Boot Splash &amp; 9 Fantasy Stages</h3>
+    <div class="grid">
+      <figure><img src="screenshots/splash.png" alt="Boot Splash" onerror="this.parentElement.style.display='none'"><figcaption>Boot Splash</figcaption></figure>
+      <figure><img src="screenshots/zone_0_crypt.png" alt="The Crypt" onerror="this.parentElement.style.display='none'"><figcaption>0 · The Crypt</figcaption></figure>
+      <figure><img src="screenshots/zone_1_tavern.png" alt="The Tavern" onerror="this.parentElement.style.display='none'"><figcaption>1 · The Tavern</figcaption></figure>
+      <figure><img src="screenshots/zone_2_tundra.png" alt="The Tundra" onerror="this.parentElement.style.display='none'"><figcaption>2 · The Tundra</figcaption></figure>
+      <figure><img src="screenshots/zone_3_sands.png" alt="The Sands" onerror="this.parentElement.style.display='none'"><figcaption>3 · The Sands</figcaption></figure>
+      <figure><img src="screenshots/zone_4_glade.png" alt="The Glade" onerror="this.parentElement.style.display='none'"><figcaption>4 · The Glade</figcaption></figure>
+      <figure><img src="screenshots/zone_5_castle.png" alt="The Castle" onerror="this.parentElement.style.display='none'"><figcaption>5 · The Castle</figcaption></figure>
+      <figure><img src="screenshots/zone_6_coronation.png" alt="Coronation" onerror="this.parentElement.style.display='none'"><figcaption>6 · Coronation</figcaption></figure>
+      <figure><img src="screenshots/zone_7_spire.png" alt="The Spire" onerror="this.parentElement.style.display='none'"><figcaption>7 · The Spire</figcaption></figure>
+      <figure><img src="screenshots/zone_8_boss.png" alt="Boss" onerror="this.parentElement.style.display='none'"><figcaption>8 · Boss</figcaption></figure>
+    </div>
+    <ol style="margin-top:16px;">
+      <li><strong>Select a Stage:</strong> Turn <strong><code>SELECT</code></strong> to travel across 9 realms (Crypt, Tavern, Tundra, Sands, Glade, Castle, Coronation, Spire, Boss) &mdash; each with its own scale, chord progression, drum kit, Boss, and character timbres.</li>
+      <li><strong>Play a Phrase &amp; Attack:</strong> Play <code>1&ndash;16</code> notes on the 27-key scale keyboard (or MIDI In) to arm your Party. Hit <strong><code>PLAY/STOP</code></strong> to launch the 4-bar <code>A / B / A / C</code> battle loop: <strong>Fighter &rarr; Cleric &rarr; Sorceress</strong> step up in turn, firing flying notes at the Boss.</li>
+      <li><strong>Boss Counter-Attacks:</strong> After 3, 4, or 5 player turns (depending on the Boss), a 3-beat accelerating drum-roll buildup (<code>&gt; BOSS CHARGING!</code>) culminates in a chord sting, lunge, ripple, and a 1-bar musical curse (half-time freeze, chromatic shift, snare flood, ghost notes, mirror reversal, and more).</li>
+      <li><strong>Cast Spells &amp; Sculpt Live:</strong> Press <strong><code>EDIT</code></strong> for <strong>Haste (1.5&times;)</strong>, <strong><code>FX</code></strong> for <strong>Mirror</strong>, <strong><code>REC</code></strong> for <strong>Shatter</strong>, <strong><code>OCT-</code></strong> for <strong>Resolve (V&rarr;I)</strong>, and <strong><code>OCT+</code></strong> for <strong>Toll</strong>. Twist <strong><code>KNOB1&ndash;3</code></strong> &amp; <strong><code>KNOB5&ndash;7</code></strong> for Intensity, Drift, Density, Harmony, Weave, and BPM.</li>
+      <li><strong>Recovery:</strong> Hold <strong><code>OCT-</code></strong> while powering on to enter USB Rescue Mode anytime.</li>
+    </ol>
+    <p style="margin-bottom:0; margin-top:12px; font-size:0.92rem; color:var(--muted);">
+      Full manual &amp; source code: <a href="https://github.com/provostprovost/castletunia">github.com/provostprovost/castletunia</a>
+    </p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const HS_QUERY = new Uint8Array([0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7]);
+  const UPGRADE  = new Uint8Array([0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7]);
+  const FINISH_CHECK = 0xE0000000;
+  const FINISH_WRITE = 0xF0000000;
+  const MAXDATA = 512;
+  const BLOCKS = 20, BLK = 0x30, KEEP = 0x2F, MAX_BLOCKS = 64;
+  const PORT_RE = /fm-1|smk|elite|mke-p37|starry|felucca|sloop|clipper|melodee|fomni|x0x|makkuro|maku|rainbow|snoop|vector|vox|ota|composite|sinco|usb-midi/i;
+
+  const installBtn = document.getElementById('installBtn');
+  const fileInput = document.getElementById('fileInput');
+  const pkgLabel = document.getElementById('pkgLabel');
+  const statusEl = document.getElementById('status');
+  const logEl = document.getElementById('log');
+  const barEl = document.getElementById('bar');
+
+  let customRaw = null;
+
+  function log(msg) {
+    logEl.textContent += msg + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setStatus(msg, cls = '') {
+    statusEl.textContent = msg;
+    statusEl.className = 'status ' + cls;
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  fileInput.addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    customRaw = new Uint8Array(await f.arrayBuffer());
+    pkgLabel.innerHTML = `Package: <code>${f.name}</code> (${(customRaw.length / 1024).toFixed(0)} KB)`;
+  });
+
+  function pack7(data) {
+    const out = [];
+    let acc = 0, nb = 0;
+    for (let i = 0; i < data.length; i++) {
+      acc |= data[i] << nb;
+      nb += 8;
+      while (nb >= 7) { out.push(acc & 0x7F); acc >>= 7; nb -= 7; }
+    }
+    if (nb) out.push(acc & 0x7F);
+    return new Uint8Array(out);
+  }
+
+  function unpack7(s) {
+    const out = [];
+    let acc = 0, nb = 0;
+    for (let i = 0; i < s.length; i++) {
+      acc |= (s[i] & 0x7F) << nb;
+      nb += 7;
+      while (nb >= 8) { out.push(acc & 0xFF); acc >>= 8; nb -= 8; }
+    }
+    return new Uint8Array(out);
+  }
+
+  function buildResponse(addr, data, fl = 0) {
+    const n = data.length;
+    const body = new Uint8Array(15 + n);
+    body[0] = 0x00; body[1] = 0x59; body[2] = 0x30;
+    body[3] = (n + 8) & 0xFF; body[4] = ((n + 8) >> 8) & 0xFF; body[5] = 0;
+    body[6] = fl & 0xFF;
+    body[7] = addr & 0xFF; body[8] = (addr >> 8) & 0xFF; body[9] = (addr >> 16) & 0xFF; body[10] = (addr >>> 24) & 0xFF;
+    body[11] = n & 0xFF; body[12] = (n >> 8) & 0xFF; body[13] = 0;
+    body.set(data, 14);
+    let sum = 0;
+    for (let i = 6; i < 14 + n; i++) sum += body[i];
+    body[14 + n] = (~sum) & 0xFF;
+    const packed = pack7(body);
+    const pkt = new Uint8Array(packed.length + 2);
+    pkt[0] = 0xF0;
+    pkt.set(packed, 1);
+    pkt[pkt.length - 1] = 0xF7;
+    return pkt;
+  }
+
+  function parseRequest(pkt) {
+    if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
+    const u = unpack7(pkt.subarray(1, pkt.length - 1));
+    if (u.length !== 15 || u[0] !== 0x00 || u[1] !== 0x59 || u[2] !== 0x30) return null;
+    let sum = 0;
+    for (let i = 6; i < 14; i++) sum += u[i];
+    if (((~sum) & 0xFF) !== u[14]) return null;
+    const addr = (u[7] | (u[8] << 8) | (u[9] << 16) | (u[10] << 24)) >>> 0;
+    const len = u[11] | (u[12] << 8) | (u[13] << 16);
+    return { fl: u[6], addr, len };
+  }
+
+  function parseIdentity(pkt) {
+    if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
+    const d = unpack7(pkt.subarray(1, pkt.length - 1));
+    if (d.length !== 34 || d[0] !== 0x00 || d[1] !== 0x59 || d[2] !== 0x11) return null;
+    let end = 6;
+    while (end < 33 && d[end] !== 0) end++;
+    const txt = String.fromCharCode(...d.subarray(6, end));
+    const m = /^([^_]+)_(\d+)$/.exec(txt);
+    return m ? { text: txt, model: m[1], version: parseInt(m[2], 10), loader: m[1].toLowerCase().startsWith('ota-') } : null;
+  }
+
+  function blockCount(raw) {
+    let n = BLOCKS;
+    while (n < MAX_BLOCKS && (n + 1) * BLK <= raw.length && raw[n * BLK + KEEP] === 0x7D) n++;
+    return n;
+  }
+
+  function deinterleave(raw) {
+    if (raw.length < BLOCKS * BLK) throw new Error('Invalid .fwsc package (too short)');
+    const n = blockCount(raw);
+    const out = new Uint8Array(raw.length - n);
+    let pos = 0;
+    for (let i = 0; i < n; i++) {
+      out.set(raw.subarray(i * BLK, i * BLK + KEEP), pos);
+      pos += KEEP;
+    }
+    out.set(raw.subarray(n * BLK), pos);
+    let prod = '';
+    for (let i = 0; i < BLOCKS; i++) {
+      const m = raw[i * BLK + KEEP];
+      if (m !== 0x7D) prod += String.fromCharCode((m - i - 1) & 0xFF);
+    }
+    return { image: out, product: prod };
+  }
+
+  async function findDevice(midi, wantFn, timeoutMs = 4000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const inputs = [...midi.inputs.values()].filter(p => PORT_RE.test(p.name));
+      const outputs = [...midi.outputs.values()];
+      for (const inp of inputs) {
+        const out = outputs.find(o => o.name === inp.name) || outputs.find(o => PORT_RE.test(o.name));
+        if (!out) continue;
+        const queue = [];
+        inp.onmidimessage = (ev) => {
+          if (ev.data && ev.data[0] === 0xF0) queue.push(new Uint8Array(ev.data));
+        };
+        await inp.open(); await out.open();
+        for (let t = 0; t < 3; t++) {
+          out.send(HS_QUERY);
+          const end = Date.now() + 700;
+          while (Date.now() < end) {
+            if (queue.length) {
+              const id = parseIdentity(queue.shift());
+              if (id && wantFn(id)) return { inp, out, id, queue };
+            }
+            await sleep(20);
+          }
+        }
+        inp.onmidimessage = null;
+      }
+      await sleep(500);
+    }
+    return null;
+  }
+
+  async function serve(dev, image, finishAddr, idleMs, onProgress) {
+    let last = Date.now(), served = 0;
+    while (true) {
+      if (dev.queue.length) {
+        const pkt = dev.queue.shift();
+        const req = parseRequest(pkt);
+        if (!req) continue;
+        last = Date.now();
+        if (req.addr === FINISH_CHECK || req.addr === FINISH_WRITE) {
+          dev.out.send(buildResponse(req.addr, new TextEncoder().encode('success\0')));
+          if (req.addr === finishAddr) return true;
+          continue;
+        }
+        if (req.len > MAXDATA || req.addr + req.len > image.length) {
+          throw new Error(`Device requested out-of-bounds address 0x${req.addr.toString(16)}`);
+        }
+        await sleep(8);
+        dev.out.send(buildResponse(req.addr, image.subarray(req.addr, req.addr + req.len), req.fl));
+        served++;
+        onProgress(served, req.addr + req.len);
+      } else {
+        if (Date.now() - last > idleMs) return false;
+        await sleep(10);
+      }
+    }
+  }
+
+  installBtn.addEventListener('click', async () => {
+    installBtn.disabled = true;
+    logEl.textContent = '';
+    barEl.style.width = '0%';
+    try {
+      if (!navigator.requestMIDIAccess) {
+        throw new Error('WebMIDI is not supported in this browser. Use Chrome, Edge, or Opera.');
+      }
+      setStatus('Loading firmware package...');
+      let raw = customRaw;
+      if (!raw) {
+        const resp = await fetch('./castletunia.fwsc');
+        if (!resp.ok) throw new Error('Could not fetch castletunia.fwsc');
+        raw = new Uint8Array(await resp.arrayBuffer());
+      }
+      const { image, product } = deinterleave(raw);
+      log(`Package: ${product} (${image.length} bytes)`);
+
+      setStatus('Requesting USB-MIDI access...');
+      const midi = await navigator.requestMIDIAccess({ sysex: true });
+
+      setStatus('Looking for M-VAVE FM-1...');
+      let dev = await findDevice(midi, id => /fm-1|smk-37|mke-p37/i.test(id.model), 6000);
+      if (!dev) throw new Error('FM-1 not found. Make sure it is powered on and connected via USB-C.');
+      log(`Connected: ${dev.id.text} (${dev.inp.name})`);
+
+      if (!dev.id.loader) {
+        setStatus('Checking package on FM-1...');
+        dev.out.send(UPGRADE);
+        const okCheck = await serve(dev, image, FINISH_CHECK, 10000, (n) => {
+          setStatus(`Checking package (${n} reads)...`);
+        });
+        dev.inp.onmidimessage = null;
+        if (!okCheck) throw new Error('FM-1 stopped answering during package check.');
+        log('Package verified. Switching to update loader...');
+        setStatus('Switching to update mode...');
+        await sleep(2500);
+        dev = await findDevice(midi, id => id.loader, 30000);
+        if (!dev) throw new Error('Update loader did not appear. Unplug/replug USB and click Install again.');
+        log(`Loader ready: ${dev.id.text}`);
+      } else {
+        log(`Resuming update loader: ${dev.id.text}`);
+      }
+
+      setStatus('Writing Castletunia firmware...');
+      dev.out.send(UPGRADE);
+      const okWrite = await serve(dev, image, FINISH_WRITE, 180000, (_n, end) => {
+        const pct = Math.min(99, Math.floor((end * 100) / image.length));
+        barEl.style.width = pct + '%';
+        setStatus(`Writing firmware... ${pct}%`);
+      });
+      dev.inp.onmidimessage = null;
+      if (!okWrite) throw new Error('Loader stopped answering while writing.');
+      barEl.style.width = '100%';
+      log('Write complete. Waiting for FM-1 to restart...');
+      setStatus('Restarting FM-1...');
+      await sleep(3000);
+
+      const back = await findDevice(midi, id => !id.loader, 40000);
+      if (!back) throw new Error('Write finished, but FM-1 did not reconnect automatically. Power-cycle it.');
+      back.inp.onmidimessage = null;
+      log(`Done! Running ${back.id.text}`);
+      setStatus(`Done! Your FM-1 is now running Castletunia (${back.id.text}).`, 'ok');
+    } catch (err) {
+      log('Error: ' + err.message);
+      setStatus(err.message, 'err');
+    } finally {
+      installBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
