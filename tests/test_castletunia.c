@@ -341,14 +341,21 @@ static void run_stage4(void)
     assert(hal_settings_load(&loaded, sizeof(loaded)) == 0);
     assert(loaded.zone_id == 3);
 
-    /* 5. Key LEDs while paused = all 27 keys solid white */
+    /* 5. Key LEDs while paused = dim glow on root keys (0,7,14,21), bright on held keys */
     g_state.playing = 1;
+    fm1_in.notes = 0;
     mock_btn_press = (1u << BTN_PLAY);
     input_process();
     assert(g_state.playing == 0);
     for (int k = 0; k < 27; k++) {
-        assert((mock_leds >> KEY_LED(k)) & 1u);
+        int is_root = (k == 0 || k == 7 || k == 14 || k == 21);
+        assert(((mock_leds >> KEY_LED(k)) & 1u) == 0u);
+        assert(((mock_glow >> KEY_LED(k)) & 1u) == (uint64_t)is_root);
     }
+    fm1_in.notes = (1u << 2);
+    input_process();
+    assert(((mock_leds >> KEY_LED(2)) & 1u) == 1u);
+    fm1_in.notes = 0;
 
     printf("Stage 4 PASSED!\n");
 }

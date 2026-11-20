@@ -338,15 +338,16 @@ void seed_commit_capture(void)
         uint32_t step;
         if (count == 1u) {
             step = 0u;
-        } else if (span > 0u && span < 24u) {
-            /* Spread rapid phrases across syncopated 16ths instead of bunching at beat 1 */
-            step = (g_state.capture.rel_tick[i] * 13u) / span;
+        } else if (span < 24u) {
+            /* Rapid phrase: place cleanly on consecutive 8th/16th steps */
+            step = ((uint32_t)i * ((count <= 4u) ? 2u : 1u)) % 16u;
         } else {
+            /* Snap to nearest 16th-note (6 ticks = 1/4 beat, preserving beats & half-beats) */
             step = ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
         }
-        /* Nudge to next free 16th step with syncopated +3 stride */
+        /* Nudge collisions to the next free 16th (+1) instead of jumping +3 */
         for (uint8_t tries = 0; tries < 16u && (used_steps & (1u << step)); tries++) {
-            step = (step + ((tries < 8u) ? 3u : 1u)) % 16u;
+            step = (step + 1u) % 16u;
         }
         used_steps |= (uint16_t)(1u << step);
         if (step > max_step) max_step = step;
@@ -386,7 +387,7 @@ void seed_commit_capture(void)
     g_state.playing = 1u;
     if (was_paused) {
         /* Starting from pause: align step_16th so the entered melody starts immediately on beat 1 */
-        static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 3u, 6u};
+        static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 2u, 4u};
         g_state.tick_in_16th = 0u;
         g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
     }
@@ -700,8 +701,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     /* Never steal/overwrite the voice of the Party member currently recording */
     if ((g_state.capture.active || g_state.held_keys_mask != 0u) && s == g_state.next_slot) return;
 
-    /* Stagger Party slots with syncopated call-and-response (Fighter=0, Cleric=+3, Sorceress=+6) */
-    static const uint8_t SLOT_OFFSET[3] = {0u, 3u, 6u};
+    /* Stagger Party slots on beat/half-beat (Fighter=0, Cleric=+2 [half-beat], Sorceress=+4 [beat 2]) */
+    static const uint8_t SLOT_OFFSET[3] = {0u, 2u, 4u};
     uint8_t len = (g_state.settings.weave > 65u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
     uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
@@ -868,9 +869,11 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     sl->anim_timer = 8u;
     g_state.dirty_party = 1u;
 
-    if (midi >= 53u && midi < 80u) {
-        g_state.active_note_leds |= (1u << (midi - 53u));
-    }
+    /* Map scale degree (folding octaves into 0..26) so LEDs match the scale keyboard */
+    int32_t led_k = deg;
+    while (led_k < 0) led_k += 7;
+    while (led_k >= 27) led_k -= 7;
+    g_state.active_note_leds |= (1u << (uint32_t)led_k);
 }
 
 void engine_tick_ppqn(void)

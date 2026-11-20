@@ -21,30 +21,41 @@ void input_init(void)
     g_rec_hold_fired = 0u;
 }
 
+static uint32_t g_key_led_until[27];
+
 static void update_leds(uint32_t now)
 {
     uint32_t note_leds = g_state.active_note_leds;
     g_state.active_note_leds = 0u;
-
-    if (!g_state.playing) {
+    if (note_leds != 0u) {
         for (uint32_t k = 0; k < 27u; k++) {
+            if ((note_leds >> k) & 1u) g_key_led_until[k] = now + 100u;
+        }
+    }
+
+    uint8_t buildup_pulse = (g_state.boss_buildup_steps > 0u) && (((now >> 6) & 1u) != 0u);
+
+    for (uint32_t k = 0; k < 27u; k++) {
+        uint8_t is_root = (k == 0u || k == 7u || k == 14u || k == 21u);
+        uint8_t held    = (uint8_t)((g_prev_notes >> k) & 1u);
+        uint8_t bright  = held;
+
+        if (g_state.playing) {
+            uint8_t note_on = ((int32_t)(g_key_led_until[k] - now) > 0);
+            if (note_on || (is_root && (g_state.beat1_flash > 0u || buildup_pulse))) {
+                bright = 1u;
+            }
+        }
+
+        if (bright) {
             hal_led_key(KEY_LED(k), 1);
             hal_led_glow(KEY_LED(k), 0);
-        }
-    } else {
-        for (uint32_t k = 0; k < 27u; k++) {
-            uint8_t is_root = (k == 0u || k == 7u || k == 14u || k == 21u);
-            uint8_t sounding = (uint8_t)((note_leds >> k) & 1u);
-            if (sounding || (is_root && g_state.beat1_flash > 0u)) {
-                hal_led_key(KEY_LED(k), 1);
-                hal_led_glow(KEY_LED(k), 0);
-            } else if (is_root) {
-                hal_led_key(KEY_LED(k), 0);
-                hal_led_glow(KEY_LED(k), 1);
-            } else {
-                hal_led_key(KEY_LED(k), 0);
-                hal_led_glow(KEY_LED(k), 0);
-            }
+        } else if (is_root) {
+            hal_led_key(KEY_LED(k), 0);
+            hal_led_glow(KEY_LED(k), 1);
+        } else {
+            hal_led_key(KEY_LED(k), 0);
+            hal_led_glow(KEY_LED(k), 0);
         }
     }
 
