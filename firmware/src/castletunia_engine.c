@@ -368,12 +368,12 @@ void seed_commit_capture(void)
     for (uint8_t i = 0; i < count; i++) {
         uint32_t step;
         if (count == 1u) {
-            step = 0u;
-        } else if (span < 24u) {
-            /* Rapid phrase: consecutive 8th/16th steps */
+            step = g_state.playing ? (((g_state.capture.rel_tick[0] + 3u) / 6u) % 16u) : 0u;
+        } else if (span < 24u && !g_state.playing) {
+            /* Rapid phrase from stop: consecutive 8th/16th steps starting at beat 1 */
             step = ((uint32_t)i * ((count <= 4u) ? 2u : 1u)) % 16u;
         } else {
-            /* Quantize to 16ths so intentional 16th patterns survive */
+            /* Quantize to 16ths aligned to bar position (or beat 1 when stopped) */
             step = ((g_state.capture.rel_tick[i] + 3u) / 6u) % 16u;
         }
         /* Nudge collisions to the next free 16th (+1) */
@@ -436,9 +436,8 @@ void seed_commit_capture(void)
     g_state.playing = 1u;
     if (was_paused) {
         /* Starting from pause: align step_16th so the entered melody starts immediately on beat 1 */
-        static const uint8_t SLOT_OFF_ALIGN[3] = {0u, 2u, 4u};
         g_state.tick_in_16th = 0u;
-        g_state.step_16th = (uint8_t)((16u - SLOT_OFF_ALIGN[s % 3u]) % 16u);
+        g_state.step_16th = 0u;
     }
     /* Launch exact number of flying music notes at Boss (no chime SFX) */
     uint8_t mir = g_state.spells.mirror_active;
@@ -495,10 +494,13 @@ void engine_on_key_down(uint8_t key_idx)
     dsp_note_on(target_slot, midi, 32767u, 72u);
 
     if (!g_state.capture.active) {
+        uint32_t bar_tick = g_state.playing
+                          ? ((uint32_t)g_state.step_16th * 6u + (uint32_t)g_state.tick_in_16th)
+                          : 0u;
         g_state.capture.active = 1u;
-        g_state.capture.start_tick = g_state.total_ticks;
+        g_state.capture.start_tick = g_state.total_ticks - bar_tick;
         g_state.capture.scale_deg[0] = key_idx;
-        g_state.capture.rel_tick[0] = 0u;
+        g_state.capture.rel_tick[0] = bar_tick;
         g_state.capture.count = 1u;
     } else if (g_state.capture.count < MAX_SEED_NOTES) {
         uint8_t idx = g_state.capture.count;
@@ -755,13 +757,12 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     /* STATUS_SLOW: half speed (even steps only), extending phrase 2x across 2 bars */
     if (ast == STATUS_SLOW && (step & 1u) != 0u) return;
 
-    /* Stagger Party slots on beat/half-beat (Fighter=0, Cleric=+2 [half-beat], Sorceress=+4 [beat 2]) */
-    static const uint8_t SLOT_OFFSET[3] = {0u, 2u, 4u};
+    /* Each slot plays at its recorded bar position (no artificial per-slot beat offset) */
     uint8_t len = (g_state.settings.weave > 65u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
     uint8_t pos = (ast == STATUS_SLOW)
-                ? (uint8_t)(((((g_state.bar_count & 1u) * 16u + step) >> 1) + SLOT_OFFSET[s % 3u]) % len)
-                : (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
+                ? (uint8_t)((((g_state.bar_count & 1u) * 16u + step) >> 1) % len)
+                : (uint8_t)((g_state.bar_count * 16u + step) % len);
 
     /* Wrap detection -> Drift & Cross-pollination decay */
     if (pos == 0u) {
@@ -799,14 +800,15 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
             for (uint8_t o = 0; o < NUM_PARTY_SLOTS; o++) {
                 if (o != s && g_state.slots[o].note_count > 0u) other_occ = 1u;
             }
-            if (pos == 0u) {
+            uint8_t anchor = sl->step_pos[0] % len;
+            if (pos == anchor) {
                 deg = base_deg;
-            } else if (pos == 6u && (other_occ || eff_density > 45u)) {
+            } else if (pos == (uint8_t)((anchor + 6u) % len) && (other_occ || eff_density > 45u)) {
                 deg = base_deg + 4;
-            } else if (pos == 11u && eff_density > 55u) {
+            } else if (pos == (uint8_t)((anchor + 11u) % len) && eff_density > 55u) {
                 deg = base_deg + 7;
                 vel_pct = 78u;
-            } else if (pos == 14u && eff_density > 70u) {
+            } else if (pos == (uint8_t)((anchor + 14u) % len) && eff_density > 70u) {
                 deg = base_deg + 2;
                 vel_pct = 72u;
             }
