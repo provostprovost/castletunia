@@ -191,18 +191,39 @@ void engine_advance_next_slot(void)
     g_state.dirty_party = 1u;
 }
 
+void engine_poll_status_timers(void)
+{
+    uint32_t now = hal_ms();
+    for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
+        if (g_state.slots[s].audio_status != g_state.slots[s].status &&
+            (int32_t)(now - g_state.status_commit_ms[s]) >= 0) {
+            uint8_t st = g_state.slots[s].status;
+            g_state.slots[s].audio_status = st;
+            g_state.slots[s].frozen = (st == STATUS_FREEZE) ? 1u : 0u;
+            if (g_state.slots[s].frozen) {
+                dsp_voice_quick_release(s);
+                if (g_state.next_slot == s) {
+                    g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
+                }
+            }
+            g_state.dirty_party = 1u;
+        }
+    }
+}
+
 void engine_toggle_freeze(uint8_t slot)
 {
     if (slot >= NUM_PARTY_SLOTS) return;
-    g_state.slots[slot].frozen ^= 1u;
-    if (g_state.slots[slot].frozen) {
-        dsp_voice_quick_release(slot);
-        if (g_state.next_slot == slot) {
-            g_state.next_slot = find_next_unfrozen_slot((uint8_t)((slot + 1u) % NUM_PARTY_SLOTS));
-        }
-    }
+    static const char *const STATUS_MSGS[3][5] = {
+        { "> FIGHTER: CLEAR",   "> FIGHTER: SLOW!",   "> FIGHTER: POISON!",   "> FIGHTER: BERSERK!",   "> FIGHTER: FROZEN" },
+        { "> CLERIC: CLEAR",    "> CLERIC: SLOW!",    "> CLERIC: POISON!",    "> CLERIC: BERSERK!",    "> CLERIC: FROZEN" },
+        { "> SORCERESS: CLEAR", "> SORCERESS: SLOW!", "> SORCERESS: POISON!", "> SORCERESS: BERSERK!", "> SORCERESS: FROZEN" }
+    };
+    uint8_t st = (uint8_t)((g_state.slots[slot].status + 1u) % 5u);
+    g_state.slots[slot].status = st;
+    g_state.status_commit_ms[slot] = hal_ms() + 1000u;
     g_state.dirty_party = 1u;
-    engine_set_ticker(g_state.slots[slot].frozen ? "> PARTY MEMBER FROZEN" : "> THAWED!");
+    engine_set_ticker(STATUS_MSGS[slot][st]);
 }
 
 void engine_clear_slot(uint8_t slot)
@@ -728,14 +749,19 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
 {
     SeedSlot *sl = &g_state.slots[s];
     if (sl->frozen || sl->note_count == 0u) return;
+    uint8_t ast = sl->audio_status;
     /* Never steal/overwrite the voice of the Party member currently recording */
     if ((g_state.capture.active || g_state.held_keys_mask != 0u) && s == g_state.next_slot) return;
+    /* STATUS_SLOW: half speed (even steps only), extending phrase 2x across 2 bars */
+    if (ast == STATUS_SLOW && (step & 1u) != 0u) return;
 
     /* Stagger Party slots on beat/half-beat (Fighter=0, Cleric=+2 [half-beat], Sorceress=+4 [beat 2]) */
     static const uint8_t SLOT_OFFSET[3] = {0u, 2u, 4u};
     uint8_t len = (g_state.settings.weave > 65u) ? sl->weave_length : sl->base_length;
     if (len == 0u) len = 16u;
-    uint8_t pos = (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
+    uint8_t pos = (ast == STATUS_SLOW)
+                ? (uint8_t)(((((g_state.bar_count & 1u) * 16u + step) >> 1) + SLOT_OFFSET[s % 3u]) % len)
+                : (uint8_t)((g_state.bar_count * 16u + step + SLOT_OFFSET[s % 3u]) % len);
 
     /* Wrap detection -> Drift & Cross-pollination decay */
     if (pos == 0u) {
@@ -802,8 +828,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 break;
             }
         }
-        /* Density blooming (65..100%) adds passing tones on beats/8ths, or 16ths only when anchored to that beat */
-        if (deg < 0 && eff_density >= 65u) {
+        /* Density blooming (65..100%) or Berserk slashes on anchored beats/8ths */
+        if (deg < 0 && (eff_density >= 65u || ast == STATUS_BERSERK)) {
             uint8_t allow_bloom = ((pos & 1u) == 0u) || (boss_active && zc == 2u);
             if (!allow_bloom) {
                 /* Odd 16th (e or a): only allow if this beat already has an anchor on 1 or & */
@@ -817,7 +843,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                     }
                 }
             }
-            uint8_t chance = (boss_active && zc == 2u) ? 55u : (uint8_t)(eff_density - 58u);
+            uint8_t chance = (boss_active && zc == 2u) ? 55u
+                           : ((ast == STATUS_BERSERK) ? 45u : (uint8_t)(eff_density - 58u));
             if (allow_bloom && (engine_prng() % 100u) < chance) {
                 static const int8_t ORN[3] = {1, -1, 2};
                 static const int8_t OVERGROW[3] = {2, 4, 7};
@@ -901,6 +928,22 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
         if ((engine_prng() % 100u) < 35u) deg += 7;
     }
 
+    /* Per-character RPG Status Effect DSP modifiers (applied dynamically; leaves stored riff intact) */
+    if (ast == STATUS_SLOW) {
+        /* Transposes/fits stretched 2-bar notes to each bar's active chord */
+        deg = snap_to_chord_gravity(deg, c_root);
+    } else if (ast == STATUS_POISON) {
+        uint32_t pr = engine_prng();
+        if ((pr % 100u) < 45u) {
+            deg = ((pr & 1u) != 0u) ? (c_root + 6) : (deg - 1); /* vii tension or creeping flat decay */
+            if (deg < 0) deg = 0;
+        }
+        vel_pct = (uint8_t)((vel_pct * 82u) / 100u);
+    } else if (ast == STATUS_BERSERK) {
+        if ((engine_prng() % 100u) < 35u) deg += 7;
+        vel_pct = 125u;
+    }
+
     /* Harmonic & Contrapuntal Weave (Weave >= 35%): voices avoid unison/2nd clashes and interlock */
     if (g_state.settings.weave >= 35u) {
         for (uint8_t other = 0u; other < NUM_PARTY_SLOTS; other++) {
@@ -927,7 +970,9 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     vel_q15 = (vel_q15 * (uint32_t)sl->fade_gain_q8) >> 8;
     if (vel_q15 > 32767u) vel_q15 = 32767u;
 
-    uint16_t gate = (g_state.spells.haste_active && s >= 1u) ? 4u : 8u;
+    uint16_t gate = (ast == STATUS_SLOW) ? 16u
+                  : ((ast == STATUS_BERSERK) ? 5u
+                  : ((g_state.spells.haste_active && s >= 1u) ? 4u : 8u));
     dsp_note_on(s, midi, (uint16_t)vel_q15, gate);
     sl->playhead = pos;
     sl->anim_timer = 8u;

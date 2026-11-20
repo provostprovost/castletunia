@@ -21,6 +21,15 @@ void input_init(void)
     g_rec_hold_fired = 0u;
 }
 
+static uint8_t status_led_val(uint8_t st, uint32_t t_ms)
+{
+    if (st == STATUS_FREEZE)  return 1u;
+    if (st == STATUS_SLOW)    return (uint8_t)((t_ms >> 8) & 1u);
+    if (st == STATUS_POISON)  return (uint8_t)((t_ms >> 7) & 1u);
+    if (st == STATUS_BERSERK) return (uint8_t)((t_ms >> 5) & 1u);
+    return 0u;
+}
+
 static uint32_t g_key_led_until[27];
 
 static void update_leds(uint32_t now)
@@ -61,9 +70,9 @@ static void update_leds(uint32_t now)
 
     if (g_state.beat1_flash > 0u) g_state.beat1_flash--;
 
-    hal_led_key(BTN_FX, g_state.slots[0].frozen);
-    hal_led_key(BTN_SEL, g_state.slots[1].frozen);
-    hal_led_key(BTN_ENV, g_state.slots[2].frozen);
+    hal_led_key(BTN_FX,  status_led_val(g_state.slots[0].status, now));
+    hal_led_key(BTN_SEL, status_led_val(g_state.slots[1].status, now));
+    hal_led_key(BTN_ENV, status_led_val(g_state.slots[2].status, now));
     hal_led_key(BTN_LFO, g_state.spells.haste_active ? (int)((now >> 6) & 1u) : 0);
     hal_led_key(BTN_EDIT, g_state.spells.mirror_active);
     hal_led_key(BTN_PLAY, g_state.playing ? (g_state.beat1_flash > 0u ? 0 : 1) : 0);
@@ -72,6 +81,7 @@ static void update_leds(uint32_t now)
 void input_process(void)
 {
     uint32_t now = hal_ms();
+    engine_poll_status_timers();
 
     /* 1. 27-Key Scanner */
     uint32_t keys = fm1_in.notes;

@@ -26,6 +26,14 @@ typedef struct {
     uint16_t decay_q15;       /* Q15 amplitude decay multiplier (32715..32761) */
 } PercPatch;
 
+typedef enum {
+    STATUS_NONE = 0,
+    STATUS_SLOW = 1,
+    STATUS_POISON = 2,
+    STATUS_BERSERK = 3,
+    STATUS_FREEZE = 4
+} PartyStatus;
+
 typedef struct {
     int8_t   scale_deg[MAX_SEED_NOTES]; /* 0..26 relative scale degree, -1 = rest */
     uint8_t  step_pos[MAX_SEED_NOTES];  /* 0..15 step position */
@@ -33,7 +41,9 @@ typedef struct {
     uint8_t  base_length;               /* 4, 8, or 16 steps */
     uint8_t  weave_length;              /* 5, 7, 11, or 13 steps */
     uint8_t  playhead;                  /* Current step index */
-    uint8_t  frozen;                    /* 1 = locked from Drift & overwrite */
+    uint8_t  frozen;                    /* 1 = STATUS_FREEZE active in audio (locked & muted) */
+    uint8_t  status;                    /* Pending/visual PartyStatus: 0=None, 1=Slow, 2=Poison, 3=Berserk, 4=Freeze */
+    uint8_t  audio_status;              /* Committed audio PartyStatus (kicks in after ~1s grace window) */
     uint8_t  fade_gain_q8;              /* 0..255 smooth fade-in/out */
     uint8_t  anim_timer;                /* Frames remaining for sprite hop/cast */
 } SeedSlot;
@@ -166,6 +176,7 @@ typedef struct {
     uint8_t           boss_curse_bars;
     uint8_t           boss_buildup_steps;
     uint8_t           boss_turn_cnt;
+    uint32_t          status_commit_ms[NUM_PARTY_SLOTS];
     NoteProjectile    note_fx[MAX_SEED_NOTES];
 } CastletuniaState;
 

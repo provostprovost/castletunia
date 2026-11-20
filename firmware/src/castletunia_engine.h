@@ -20,6 +20,7 @@ void seed_commit_capture(void);
 void seed_cancel_capture(void);
 
 void engine_toggle_freeze(uint8_t slot);
+void engine_poll_status_timers(void);
 void engine_clear_slot(uint8_t slot);
 void engine_clear_all_unfrozen(void);
 void engine_advance_next_slot(void);

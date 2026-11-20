@@ -128,10 +128,17 @@ static void run_stage1(void)
     assert(g_state.capture.active == 0);
     assert(g_state.slots[0].note_count == 2);
 
-    /* 4. Freeze slot skipping & All-frozen Live Jam bypass */
-    engine_toggle_freeze(0);
-    engine_toggle_freeze(1);
-    engine_toggle_freeze(2);
+    /* 4. Status cycle (None -> Slow -> Poison -> Berserk -> Freeze -> None) with 1s grace + Live Jam bypass */
+    engine_toggle_freeze(0); assert(g_state.slots[0].status == STATUS_SLOW && g_state.slots[0].audio_status == STATUS_NONE);
+    engine_toggle_freeze(0); assert(g_state.slots[0].status == STATUS_POISON);
+    engine_toggle_freeze(0); assert(g_state.slots[0].status == STATUS_BERSERK);
+    engine_toggle_freeze(0); assert(g_state.slots[0].status == STATUS_FREEZE && !g_state.slots[0].frozen);
+    for (int i = 0; i < 4; i++) {
+        engine_toggle_freeze(1);
+        engine_toggle_freeze(2);
+    }
+    mock_ms += 1100;
+    engine_poll_status_timers();
     assert(g_state.slots[0].frozen && g_state.slots[1].frozen && g_state.slots[2].frozen);
     uint32_t prev_notes = spy_note_count;
     engine_on_key_down(7);
@@ -140,10 +147,13 @@ static void run_stage1(void)
     assert(spy_last_slot == 2); /* Red Sorceress live jam */
     assert(g_state.capture.active == 0);
 
-    /* Unfreeze all for spells */
+    /* Unfreeze all (FRZ -> NONE) for spells */
     engine_toggle_freeze(0);
     engine_toggle_freeze(1);
     engine_toggle_freeze(2);
+    mock_ms += 1100;
+    engine_poll_status_timers();
+    assert(!g_state.slots[0].frozen && g_state.slots[0].status == STATUS_NONE && g_state.slots[0].audio_status == STATUS_NONE);
 
     /* 5. All 6 Spells */
     engine_spell_haste_toggle();
@@ -290,7 +300,9 @@ static void run_stage3(void)
     save_ppm("build/screen_crypt.ppm", mock_fb);
 
     engine_spell_mirror_toggle();
-    engine_toggle_freeze(0);
+    for (int i = 0; i < 4; i++) engine_toggle_freeze(0); /* -> FRZ */
+    mock_ms += 1100;
+    engine_poll_status_timers();
     ui_render();
     save_ppm("build/screen_mirror_vfx.ppm", mock_fb);
     printf("Stage 3 PASSED!\n");

@@ -65,7 +65,7 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 | **`ALGORITHM`** | **Drift** (`0%–100%`: stepwise motif evolution per loop) | Fighter Volume |
 | **`KNOB1`** | **Density** (`0%–100%`: sparse thinning vs. passing-tone bloom) | Cleric Volume |
 | **`KNOB2`** | **Harmony** (`0%–100%`: chord progression richness & 3rd/5th pad) | Sorceress Volume |
-| **`KNOB3`** | **Weave** (`0%–100%`: swing pocket `15–65%`, polyrhythm `>65%`) | Percussion Volume |
+| **`KNOB3`** | **Weave** (`0%–100%`: harmonic/contrapuntal interaction `>=35%`, polyrhythm `>65%`) | Percussion Volume |
 | **`KNOB4`** | **Tempo** (`40–180 BPM`) | Reverb Override |
 
 ### Buttons
@@ -77,7 +77,7 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 | **`ARP`** | **Spell — Shatter:** Plays a crystalline FM shatter burst, shakes the screen, and fractures unfrozen patterns (starts playback if paused). |
 | **`SEQ`** | **Spell — Resolve:** Flashes a gold border and arms a `V → I` cadence on the next chord/bar. |
 | **`GLO` (Tap)** | **Spell — Toll:** Rings the Zone's boss bell with an expanding white ring (starts playback if paused). |
-| **`FX` / `SEL` / `ENV`** | **Freeze / Unfreeze** Fighter / Cleric / Sorceress (mutes their loop, skips their turn, shows `FRZ`; does not start playback). |
+| **`FX` / `SEL` / `ENV`** | **Cycle RPG Status** on Fighter / Cleric / Sorceress: `Clear` → **`SLW`** (turns into a **Sloth**, 2× length across 2 bars + chord-fit) → **`PSN`** (`vii` tension & decay) → **`BSK`** (octave/5th slashes, `125%` vel) → **`FRZ`** (mute & turn-skip). Flashes for **1 s** before audio kicks in so you can skip past states cleanly. |
 | **`HOME`** | Skip to the next unfrozen Party member without starting playback. |
 | **`REC` (Tap / Hold)** | **Tap:** Cancel recording or clear current character (`RDY`). **Hold 600 ms:** Clear all unfrozen characters. |
 | **`PLAY/STOP`** | Pause / Resume all audio (chords, drums, and loops). While paused, playing a phrase automatically resumes on commit. |

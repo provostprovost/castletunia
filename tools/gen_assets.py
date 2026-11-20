@@ -749,6 +749,8 @@ def main():
     ]
     sprites = gen_party_sprites()
     party_32, party_pals, atk_grids, atk_pals = load_party_sprites()
+    sloth_grid, sloth_pal = quantize_rgba(ASSETS / "sprites" / "sloth.png", 42)
+    sloth_data = pack_nibbles(sloth_grid)
     boss_grids, boss_pals = [], []
     for z in range(9):
         bg_grid, bg_pal = load_boss_sprite(ZONE_ORDER[z])
@@ -771,6 +773,8 @@ def main():
         "    uint16_t freeze_pal[16];",
         "    uint16_t party_pals[3][16];",
         "    uint8_t  party_sprites[3][882];",
+        "    uint16_t sloth_pal[16];",
+        "    uint8_t  sloth_sprite[882];",
         "    uint16_t party_atk_pals[3][16];",
         "    uint8_t  party_atk[3][3][882];",
         "    uint8_t  cursor_sprite[128];",
@@ -809,6 +813,8 @@ def main():
         chunk = ", ".join(f"0x{b:02X}u" for b in sdata)
         lines.append(f"        {{ {chunk} }},")
     lines.append("    },")
+    lines.append("    .sloth_pal = { " + ", ".join(f"0x{c:04X}u" for c in sloth_pal) + " },")
+    lines.append("    .sloth_sprite = { " + ", ".join(f"0x{b:02X}u" for b in sloth_data) + " },")
     lines.append("    .party_atk_pals = {")
     for name in ("fighter", "wmage", "sorceress"):
         vals = ", ".join(f"0x{c:04X}u" for c in atk_pals[name])

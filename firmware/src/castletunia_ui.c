@@ -156,14 +156,35 @@ static void render_battle_sprites(void)
     int party_recoil = (g_state.boss_atk_timer > 20u) ? 4 : ((g_state.boss_atk_timer > 8u) ? 2 : 0);
     for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
         uint8_t atk_t = g_state.attack_timer[s];
-        const uint16_t *pal = g_state.slots[s].frozen
-                            ? G_FREEZE_PALETTE
-                            : (atk_t > 0u ? castletunia_assets.party_atk_pals[s] : castletunia_assets.party_pals[s]);
-        const uint8_t *spr = castletunia_assets.party_sprites[s];
+        uint8_t st = g_state.slots[s].status;
+        uint8_t pending = (st != g_state.slots[s].audio_status) ? 1u : 0u;
+        uint8_t flash_alt = pending && (((hal_ms() >> 7) & 1u) != 0u);
+        const uint8_t *spr = (st == STATUS_SLOW) ? castletunia_assets.sloth_sprite : castletunia_assets.party_sprites[s];
+        const uint16_t *base_pal = (st == STATUS_SLOW)
+                                 ? castletunia_assets.sloth_pal
+                                 : (atk_t > 0u ? castletunia_assets.party_atk_pals[s] : castletunia_assets.party_pals[s]);
+        uint16_t status_pal[16];
+        const uint16_t *pal = base_pal;
+        if (flash_alt) {
+            for (int pi = 0; pi < 16; pi++) {
+                uint16_t c = base_pal[pi];
+                status_pal[pi] = (c == 0u) ? 0u : (uint16_t)(((c & 0xF7DEu) >> 1) + ((0xFFFFu & 0xF7DEu) >> 1));
+            }
+            pal = status_pal;
+        } else if (g_state.slots[s].frozen || st == STATUS_FREEZE) {
+            pal = G_FREEZE_PALETTE;
+        } else if (st == STATUS_POISON || st == STATUS_BERSERK) {
+            uint16_t tint = (st == STATUS_POISON) ? 0xC81Fu : 0xF800u;
+            for (int pi = 0; pi < 16; pi++) {
+                uint16_t c = base_pal[pi];
+                status_pal[pi] = (c == 0u) ? 0u : (uint16_t)(((c & 0xF7DEu) >> 1) + ((tint & 0xF7DEu) >> 1));
+            }
+            pal = status_pal;
+        }
         int lunge = 0;
         if (atk_t > 0u) {
             uint8_t frame = (atk_t > 10u) ? 0u : ((atk_t > 5u) ? 1u : 2u);
-            spr = castletunia_assets.party_atk[s][frame];
+            if (st != STATUS_SLOW) spr = castletunia_assets.party_atk[s][frame];
             lunge = (frame == 0u) ? -10 : ((frame == 1u) ? -28 : -16);
         } else if (party_recoil > 0) {
             lunge = party_recoil;
@@ -356,7 +377,13 @@ static void render_party_row(uint8_t s, int row_y)
     }
     hal_lcd_blit_rect(6, row_y, 16, 14, g_sprite_buf);
 
-    uint16_t name_col = g_state.slots[s].frozen ? 0x5E7Fu : (g_state.next_slot == s ? 0xFE60u : 0xFFFFu);
+    uint8_t st = g_state.slots[s].status;
+    uint16_t st_col = (st == STATUS_FREEZE || g_state.slots[s].frozen) ? 0x5E7Fu
+                    : ((st == STATUS_SLOW) ? 0x07FFu
+                    : ((st == STATUS_POISON) ? 0xC81Fu
+                    : ((st == STATUS_BERSERK) ? 0xF800u : 0xFFFFu)));
+    uint16_t name_col = (st != STATUS_NONE || g_state.slots[s].frozen) ? st_col
+                      : (g_state.next_slot == s ? 0xFE60u : 0xFFFFu);
     hal_draw_text(24, row_y, 82, NAMES[s], name_col, hud_bg_color(row_y), 0);
 
     /* Live 8-segment RPG Voice Activity Meter (pulses on note trigger) */
@@ -370,7 +397,7 @@ static void render_party_row(uint8_t s, int row_y)
             if (in_gap) {
                 c = hud_bg_color(row_y + 4 + j);
             } else if (g_state.slots[s].note_count > 0u && seg < level) {
-                c = g_state.slots[s].frozen ? 0x5E7Fu : (seg >= 6 ? 0xFFFFu : 0xFE60u);
+                c = (st != STATUS_NONE || g_state.slots[s].frozen) ? st_col : (seg >= 6 ? 0xFFFFu : 0xFE60u);
             } else if (g_state.slots[s].note_count > 0u && seg == 0u) {
                 c = g_state.slots[s].frozen ? 0x2B55u : 0x4210u;
             }
@@ -381,9 +408,18 @@ static void render_party_row(uint8_t s, int row_y)
 
     char badge[8];
     uint16_t bcol;
-    if (g_state.slots[s].frozen) {
+    if (g_state.slots[s].frozen || st == STATUS_FREEZE) {
         badge[0]='F'; badge[1]='R'; badge[2]='Z'; badge[3]='\0';
         bcol = 0x5E7Fu;
+    } else if (st == STATUS_SLOW) {
+        badge[0]='S'; badge[1]='L'; badge[2]='W'; badge[3]='\0';
+        bcol = 0x07FFu;
+    } else if (st == STATUS_POISON) {
+        badge[0]='P'; badge[1]='S'; badge[2]='N'; badge[3]='\0';
+        bcol = 0xC81Fu;
+    } else if (st == STATUS_BERSERK) {
+        badge[0]='B'; badge[1]='S'; badge[2]='K'; badge[3]='\0';
+        bcol = 0xF800u;
     } else if (g_state.spells.haste_active && s >= 1u) {
         badge[0]='H'; badge[1]='S'; badge[2]='T'; badge[3]='\0';
         bcol = 0xFE60u;
@@ -435,7 +471,7 @@ void ui_render_splash(void)
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
     }
-    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.0.2", 0xFE60u, 0x0021u, 1);
+    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.1.0", 0xFE60u, 0x0021u, 1);
 }
 
 void ui_init(void)
@@ -579,10 +615,12 @@ void ui_render(void)
 
     if (g_state.dirty_party) {
         static const int ROW_Y[3] = {179, 193, 207};
+        uint8_t any_pending = 0u;
         for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
             render_party_row(s, ROW_Y[s]);
+            if (g_state.slots[s].status != g_state.slots[s].audio_status) any_pending = 1u;
         }
-        g_state.dirty_party = 0u;
+        if (!any_pending) g_state.dirty_party = 0u;
     }
 
     if (g_state.dirty_ticker) {
