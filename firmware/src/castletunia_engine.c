@@ -127,16 +127,22 @@ void engine_init_defaults(void)
     for (uint32_t i = 0; i < sizeof(g_state); i++) {
         ((uint8_t *)&g_state)[i] = 0;
     }
+#if defined(STANDALONE_TEST) || defined(DINGHY_HOST)
+    uint8_t start_zone = 0u;
+#else
+    uint32_t ent = hal_ms() ^ (hal_ms() << 13) ^ 0x5EED16B1u;
+    uint8_t start_zone = (uint8_t)(ent % NUM_ZONES);
+#endif
     g_state.settings.magic = SETTINGS_MAGIC;
     g_state.settings.version = 1u;
-    g_state.settings.zone_id = 0u;
+    g_state.settings.zone_id = start_zone;
     g_state.settings.root_semitone = 2u; /* D */
-    g_state.settings.bpm = G_ZONES[0].default_bpm;
-    g_state.settings.intensity = 40u;
-    g_state.settings.drift = 36u;
-    g_state.settings.density = 52u;
-    g_state.settings.harmony = 56u;
-    g_state.settings.weave = 24u;
+    g_state.settings.bpm = G_ZONES[start_zone].default_bpm;
+    g_state.settings.intensity = 50u;
+    g_state.settings.drift = 25u;
+    g_state.settings.density = 55u;
+    g_state.settings.harmony = 60u;
+    g_state.settings.weave = 35u;
     g_state.settings.mix_drone = 88u;
     g_state.settings.mix_slots[0] = 108u;
     g_state.settings.mix_slots[1] = 100u;
@@ -158,8 +164,28 @@ void engine_init_defaults(void)
     g_state.dirty_diorama = 1u;
     g_state.dirty_header = 1u;
     g_state.dirty_party = 1u;
-    engine_set_ticker("> ENTERING THE CRYPT");
+    {
+        char msg[32];
+        msg[0] = '>'; msg[1] = ' ';
+        copy_str(msg + 2, G_ZONES[start_zone].name, sizeof(msg) - 2u);
+        engine_set_ticker(msg);
+    }
     update_drone_pitch();
+}
+
+static const uint8_t G_BOSS_CD[9] = { 4u, 4u, 5u, 3u, 3u, 4u, 4u, 4u, 5u };
+
+uint8_t engine_stage_turn_target(uint8_t zone_id)
+{
+    uint8_t cd = G_BOSS_CD[zone_get(zone_id)->subgenre_id % 9u];
+    return (uint8_t)(((7u / cd) + 1u) * cd); /* >= 8 turns, aligned to Boss cooldown */
+}
+
+void engine_toggle_stage_lock(void)
+{
+    g_state.stage_locked ^= 1u;
+    g_state.dirty_header = 1u;
+    engine_set_ticker(g_state.stage_locked ? "> STAGE LOCKED" : "> STAGE UNLOCKED");
 }
 
 void engine_set_zone(uint8_t zone_id)
@@ -178,6 +204,12 @@ void engine_set_zone(uint8_t zone_id)
         g_state.slide_frames = 12u;
         g_state.spells.resolve_armed = 0u;
         g_state.env_steps = 0u;
+        g_state.stage_turns = 0u;
+        g_state.boss_turn_cnt = 0u;
+        g_state.boss_curse_bars = 0u;
+        g_state.boss_buildup_steps = 0u;
+        g_state.victory_bar = 0u;
+        g_state.boss_defeat_timer = 0u;
         g_state.settings.zone_id = z;
         g_state.settings.bpm = G_ZONES[z].default_bpm;
         g_state.dirty_diorama = 1u;
@@ -343,6 +375,26 @@ void seed_cancel_capture(void)
     g_state.capture.count = 0u;
 }
 
+static void advance_party_turn(void)
+{
+    uint8_t target = engine_stage_turn_target(g_state.settings.zone_id);
+    if (g_state.stage_turns < target) {
+        g_state.stage_turns++;
+    }
+    g_state.dirty_header = 1u;
+    if (g_state.slots[0].note_count == 0u || g_state.slots[1].note_count == 0u || g_state.slots[2].note_count == 0u) {
+        return;
+    }
+    uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
+    g_state.boss_turn_cnt++;
+    if (g_state.boss_turn_cnt >= G_BOSS_CD[sg] ||
+        (!g_state.stage_locked && g_state.stage_turns >= target &&
+         g_state.boss_buildup_steps == 0u && g_state.boss_curse_bars == 0u && g_state.victory_bar == 0u)) {
+        g_state.boss_turn_cnt = 0u;
+        g_state.boss_buildup_steps = 12u;
+    }
+}
+
 void seed_commit_capture(void)
 {
     if (!g_state.capture.active || g_state.capture.count == 0u) {
@@ -414,7 +466,9 @@ void seed_commit_capture(void)
     static const uint8_t WEAVE_LENS[3][2] = { {7u, 11u}, {11u, 13u}, {13u, 17u} };
     ns.weave_length = WEAVE_LENS[s][engine_prng() & 1u];
     ns.playhead = 0u;
-    ns.frozen = 0u;
+    ns.frozen = g_state.slots[s].frozen;
+    ns.status = g_state.slots[s].status;
+    ns.audio_status = g_state.slots[s].audio_status;
     ns.fade_gain_q8 = (g_state.settings.intensity > 75u) ? 255u : 0u;
     ns.anim_timer = 12u;
 
@@ -465,15 +519,7 @@ void seed_commit_capture(void)
     engine_set_ticker(ATK_MSG[s]);
 
     /* Arm Boss Counter-Attack 3-beat drum buildup according to each Boss's turn cooldown */
-    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u && g_state.slots[2].note_count > 0u) {
-        static const uint8_t BOSS_CD[9] = { 4u, 4u, 5u, 3u, 3u, 4u, 4u, 4u, 5u };
-        uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
-        g_state.boss_turn_cnt++;
-        if (g_state.boss_turn_cnt >= BOSS_CD[sg]) {
-            g_state.boss_turn_cnt = 0u;
-            g_state.boss_buildup_steps = 12u;
-        }
-    }
+    advance_party_turn();
 }
 
 void engine_on_key_down(uint8_t key_idx)
@@ -602,15 +648,7 @@ void engine_spell_shatter(void)
 
     /* Special Attack ends the turn and advances Boss cooldown */
     g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
-    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u && g_state.slots[2].note_count > 0u) {
-        static const uint8_t BOSS_CD[9] = { 4u, 4u, 5u, 3u, 3u, 4u, 4u, 4u, 5u };
-        uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
-        g_state.boss_turn_cnt++;
-        if (g_state.boss_turn_cnt >= BOSS_CD[sg]) {
-            g_state.boss_turn_cnt = 0u;
-            g_state.boss_buildup_steps = 12u;
-        }
-    }
+    advance_party_turn();
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
 }
@@ -678,6 +716,9 @@ void engine_spell_conjure(void)
     ns.note_count = count;
     ns.base_length = 16u;
     ns.weave_length = (s == 0u) ? 5u : (s == 1u ? 7u : 11u);
+    ns.frozen = g_state.slots[s].frozen;
+    ns.status = g_state.slots[s].status;
+    ns.audio_status = g_state.slots[s].audio_status;
     ns.fade_gain_q8 = 255u;
     ns.anim_timer = 12u;
 
@@ -1151,14 +1192,34 @@ void engine_tick_ppqn(void)
             if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;
         }
 
-        /* Trigger Sorceress (Lead) -> Fighter (Bass) -> Cleric (Weaves harmony between both) */
+        /* Trigger Victory Fanfare during Boss Defeat bar, otherwise normal Party loop */
         g_step_deg[0] = -1; g_step_deg[1] = -1; g_step_deg[2] = -1;
-        if (!eff_haste) {
-            trigger_slot_step(2u, step);
-        }
-        trigger_slot_step(0u, step);
-        if (!eff_haste) {
-            trigger_slot_step(1u, step);
+        if (g_state.victory_bar > 0u) {
+            static const int8_t FANFARE_DEG[16] = {
+                7, -1, 7, -1, 7, -1, 7, -1,
+                5, -1, 6, -1, 7, -1, -1, -1
+            };
+            static const uint8_t FANFARE_GATE[16] = {
+                3, 0, 3, 0, 3, 0, 5, 0,
+                5, 0, 5, 0, 14, 0, 0, 0
+            };
+            int8_t fd = FANFARE_DEG[step];
+            if (fd >= 0) {
+                uint8_t gate = FANFARE_GATE[step];
+                dsp_note_on(1u, engine_note_for_degree(fd + 7, 1u), 28000u, gate);
+                dsp_note_on(2u, engine_note_for_degree(fd, 2u), 29000u, gate);
+                if (step == 0u || step == 6u || step == 12u) {
+                    dsp_note_on(0u, engine_note_for_degree(0, 0u), 28000u, (step == 12u) ? 14u : 5u);
+                }
+            }
+        } else {
+            if (!eff_haste) {
+                trigger_slot_step(2u, step);
+            }
+            trigger_slot_step(0u, step);
+            if (!eff_haste) {
+                trigger_slot_step(1u, step);
+            }
         }
 
         /* Percussion evaluation (sensitive to Intensity, Density, and Boss Counter-Attack) */
@@ -1243,7 +1304,7 @@ void engine_tick_ppqn(void)
         dsp_perc_trigger(1u, 30000u); /* Rapid 32nd snare roll into Boss chord sting */
     }
 
-    if (eff_haste && fire_haste) {
+    if (eff_haste && fire_haste && g_state.victory_bar == 0u) {
         uint8_t hstep = (uint8_t)(((step >> 1) * 3u + (pair_tick >> 2)) & 15u);
         trigger_slot_step(1u, hstep);
         trigger_slot_step(2u, hstep);
@@ -1256,10 +1317,28 @@ void engine_tick_ppqn(void)
         if (g_state.step_16th >= 16u) {
             g_state.step_16th = 0u;
             g_state.bar_count++;
-            if (g_state.boss_curse_bars > 0u) {
+            if (g_state.victory_bar > 0u) {
+                g_state.victory_bar = 0u;
+                g_state.boss_defeat_timer = 0u;
+                g_state.stage_turns = 0u;
+                g_state.boss_turn_cnt = 0u;
+                engine_set_zone((uint8_t)((g_state.settings.zone_id + 1u) % NUM_ZONES));
+            } else if (g_state.boss_curse_bars > 0u) {
                 g_state.boss_curse_bars--;
                 if (g_state.boss_curse_bars == 0u) {
                     g_state.dirty_diorama = 1u;
+                    if (!g_state.stage_locked &&
+                        g_state.stage_turns >= engine_stage_turn_target(g_state.settings.zone_id)) {
+                        g_state.victory_bar = 1u;
+                        g_state.boss_defeat_timer = 36u;
+                        g_state.shake_timer = 24u;
+                        g_state.shake_amp = 2u;
+                        g_state.gold_flash_timer = 16u;
+                        g_state.active_chord_deg = 0u;
+                        update_drone_pitch();
+                        dsp_all_notes_off();
+                        engine_set_ticker("> BOSS DEFEATED!");
+                    }
                 }
             }
         }

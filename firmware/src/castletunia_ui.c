@@ -128,13 +128,24 @@ static void render_battle_sprites(void)
                     sample_diorama_px(z, (sx_scr + rip) >> 1, sy_scr >> 1, mirror), z);
                 int b_x = sx_scr - bx;
                 int b_y = sy_scr - by;
+                if (g_state.boss_defeat_timer > 0u) {
+                    int prog = 36 - (int)g_state.boss_defeat_timer;
+                    int tear = ((b_y & 1) ? 1 : -1) * (prog >> 1);
+                    b_x += tear;
+                    /* FF6-style progressive scanline dropout & vertical melt */
+                    if ((b_y & 1) && prog > 12) b_y = -1;
+                    if (b_y >= 96 - (prog * 3)) b_y = -1;
+                }
                 if (b_x >= 0 && b_x < 96 && b_y >= 0 && b_y < 96) {
                     int b_sx = mirror ? (95 - b_x) : b_x;
                     uint32_t idx = (uint32_t)b_y * 96u + (uint32_t)b_sx;
                     uint8_t packed = castletunia_assets.boss_sprites[z][idx >> 1];
                     uint8_t ci = (idx & 1u) ? (packed & 0x0Fu) : ((packed >> 4) & 0x0Fu);
                     if (ci != 0u) {
-                        if (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u) {
+                        if (g_state.boss_defeat_timer > 0u) {
+                            uint8_t f = g_state.boss_defeat_timer & 3u;
+                            bg = (f == 0u) ? 0xFFFFu : ((f == 1u || f == 2u) ? 0xF800u : 0xFC00u);
+                        } else if (g_state.boss_hit_timer == 9u || g_state.boss_hit_timer == 5u) {
                             bg = 0xFFFFu;
                         } else if (g_state.boss_atk_timer > 18u && (g_state.boss_atk_timer & 2u)) {
                             bg = castletunia_assets.boss_pals[z][ci] ^ 0x39E7u;
@@ -361,9 +372,37 @@ static void render_header(void)
     bpm_str[i++] = (char)('0' + (b % 10u));
     bpm_str[i++] = ' '; bpm_str[i++] = 'B'; bpm_str[i++] = 'P'; bpm_str[i++] = 'M'; bpm_str[i] = '\0';
 
-    hal_draw_text(6, 162, 92, z->name, 0xFFFFu, hud_bg_color(166), 0);
-    hal_draw_text(100, 162, 74, key_str, 0x5E7Fu, hud_bg_color(166), 1);
-    hal_draw_text(176, 162, 58, bpm_str, 0xFE60u, hud_bg_color(166), 2);
+    hal_draw_text(6, 162, 82, z->name, 0xFFFFu, hud_bg_color(166), 0);
+    if (g_state.stage_locked) {
+        /* Clear turn text area and draw 9x9 gold padlock icon next to stage name */
+        static const uint16_t LOCK_ROWS[9] = {
+            0x07Cu, 0x0C6u, 0x082u, 0x082u, 0x1FFu, 0x1FFu, 0x1EFu, 0x1FFu, 0x1FFu
+        };
+        hal_draw_text(89, 162, 32, "", 0xFFFFu, hud_bg_color(166), 0);
+        for (int r = 0; r < 9; r++) {
+            uint16_t bg = hud_bg_color(164 + r);
+            for (int c = 0; c < 9; c++) {
+                uint16_t col = ((LOCK_ROWS[r] >> (8 - c)) & 1u) ? ((r < 4) ? 0xCE79u : 0xFE60u) : bg;
+                if (r == 6 && c == 4) col = 0x1084u;
+                g_sprite_buf[r * 9 + c] = col;
+            }
+        }
+        hal_lcd_blit_rect(90, 164, 9, 9, g_sprite_buf);
+    } else {
+        char turn_str[8];
+        uint8_t cur = g_state.stage_turns;
+        uint8_t tgt = engine_stage_turn_target(g_state.settings.zone_id);
+        int ti = 0;
+        if (cur >= 10u) turn_str[ti++] = (char)('0' + (cur / 10u));
+        turn_str[ti++] = (char)('0' + (cur % 10u));
+        turn_str[ti++] = '/';
+        if (tgt >= 10u) turn_str[ti++] = (char)('0' + (tgt / 10u));
+        turn_str[ti++] = (char)('0' + (tgt % 10u));
+        turn_str[ti] = '\0';
+        hal_draw_text(89, 162, 32, turn_str, 0x87F0u, hud_bg_color(166), 1);
+    }
+    hal_draw_text(121, 162, 56, key_str, 0x5E7Fu, hud_bg_color(166), 1);
+    hal_draw_text(178, 162, 56, bpm_str, 0xFE60u, hud_bg_color(166), 2);
 }
 
 static void render_party_row(uint8_t s, int row_y)
@@ -700,7 +739,8 @@ void ui_render(void)
     }
 
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u ||
-        g_state.toll_ring_timer > 0u || g_state.meteor_timer > 0u || g_state.boss_atk_timer > 0u) {
+        g_state.toll_ring_timer > 0u || g_state.meteor_timer > 0u || g_state.boss_atk_timer > 0u ||
+        g_state.boss_defeat_timer > 0u) {
         render_diorama_full();
         if (g_state.slide_frames == 0u) {
             render_env_particles();
@@ -729,6 +769,10 @@ void ui_render(void)
             g_state.boss_atk_timer--;
             if (g_state.boss_atk_timer == 0u) g_state.dirty_diorama = 1u;
         }
+        if (g_state.boss_defeat_timer > 0u) {
+            g_state.boss_defeat_timer--;
+            if (g_state.boss_defeat_timer == 0u) g_state.dirty_diorama = 1u;
+        }
     } else {
         if (g_state.spells.resolve_armed) {
             render_env_particles();
@@ -754,7 +798,12 @@ void ui_render(void)
 
     if (g_state.gold_flash_timer > 0u) {
         g_state.gold_flash_timer--;
-        if (g_state.gold_flash_timer == 0u) render_hud_border();
+        if (g_state.gold_flash_timer == 0u) {
+            render_hud_border();
+            g_state.dirty_header = 1u;
+            g_state.dirty_party = 1u;
+            g_state.dirty_ticker = 1u;
+        }
     }
 
     if (g_state.dirty_header) {

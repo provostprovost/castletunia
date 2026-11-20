@@ -10,6 +10,8 @@ uint32_t engine_prng(void);
 void engine_init_defaults(void);
 void engine_set_ticker(const char *msg);
 void engine_set_zone(uint8_t zone_id);
+uint8_t engine_stage_turn_target(uint8_t zone_id);
+void engine_toggle_stage_lock(void);
 uint8_t engine_note_for_degree(int32_t deg, uint8_t slot);
 uint8_t engine_drone_root_midi(void);
 

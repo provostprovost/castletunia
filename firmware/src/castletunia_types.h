@@ -197,6 +197,10 @@ typedef struct {
     uint8_t           boss_buildup_steps;
     uint8_t           boss_turn_cnt;
     uint8_t           env_steps;
+    uint8_t           stage_locked;
+    uint8_t           stage_turns;
+    uint8_t           boss_defeat_timer;
+    uint8_t           victory_bar;
     uint32_t          status_commit_ms[NUM_PARTY_SLOTS];
     NoteProjectile    note_fx[MAX_SEED_NOTES];
 } CastletuniaState;

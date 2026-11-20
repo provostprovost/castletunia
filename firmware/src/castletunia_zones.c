@@ -122,9 +122,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .high_mask_battle= 0x54A4u,
         .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740, VOICE_FM}
     },
-    /* Zone 3: THE CASTLE - Vampyric Baroque */
+    /* Zone 3: THE MANOR - Vampyric Baroque */
     {
-        .name = "THE CASTLE",
+        .name = "THE MANOR",
         .subgenre_id = 3,
         .drone_mode = DRONE_ORGAN,
         .default_bpm = 90,
@@ -146,9 +146,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .high_mask_battle= 0x5555u,
         .toll_patch = {11, 4, 42000, 0, 64, 32745, 0, 32740, VOICE_FM}
     },
-    /* Zone 7: CORONATION - Royal Fanfare */
+    /* Zone 7: THE PALACE - Royal Fanfare */
     {
-        .name = "CORONATION",
+        .name = "THE PALACE",
         .subgenre_id = 7,
         .drone_mode = DRONE_BRASS,
         .default_bpm = 104,
@@ -194,9 +194,9 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .high_mask_battle= 0x4444u,
         .toll_patch = {7, 2, 42000, 0, 64, 32745, 0, 32740, VOICE_FM}
     },
-    /* Zone 8: BOSS - 16-Bit Battle */
+    /* Zone 8: THE CHASM - 16-Bit Battle */
     {
-        .name = "BOSS",
+        .name = "THE CHASM",
         .subgenre_id = 8,
         .drone_mode = DRONE_DARK_SAW,
         .default_bpm = 138,

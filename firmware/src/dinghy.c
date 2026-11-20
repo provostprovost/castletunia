@@ -69,18 +69,6 @@ static void app_main(void)
 {
     dsp_init();
     engine_init_defaults();
-    if (hal_settings_load(&g_state.settings, sizeof(CastletuniaSaveBlob)) == 0 &&
-        g_state.settings.magic == SETTINGS_MAGIC) {
-        /* Restore zone/BPM/knobs cleanly; keep Party slots empty on boot until user plays */
-        const ZoneDef *z = zone_get(g_state.settings.zone_id);
-        uint8_t r = engine_drone_root_midi();
-        dsp_drone_set(r,
-                      (uint8_t)(r + z->scale_semitones[2]),
-                      (uint8_t)(r + z->scale_semitones[4]),
-                      (g_state.settings.harmony >= 35u) ? 1u : 0u,
-                      (g_state.settings.harmony >= 20u) ? 1u : 0u,
-                      g_state.settings.mix_drone);
-    }
     input_init();
 #ifndef DINGHY_HOST
     ui_render_splash();
@@ -95,6 +83,11 @@ static void app_main(void)
                 break;
             }
         }
+        /* Pick a random starting stage using splash timing + encoder detent states */
+        uint32_t ent = hal_ms() ^ (fm1_in.frames << 7) ^ fm1_in.notes;
+        for (uint8_t p = 0; p < 7u; p++) ent ^= ((uint32_t)fm1_in.enc_rest[p] << (p * 3u));
+        engine_set_zone((uint8_t)(ent % NUM_ZONES));
+        g_state.slide_frames = 0u;
     }
 #endif
     ui_init();

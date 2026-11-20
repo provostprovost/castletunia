@@ -76,6 +76,7 @@ static void update_leds(uint32_t now)
     hal_led_key(BTN_LFO, g_state.spells.haste_active ? (int)((now >> 6) & 1u) : 0);
     hal_led_key(BTN_EDIT, g_state.spells.mirror_active);
     hal_led_key(BTN_SEQ, g_state.spells.resolve_armed);
+    hal_led_key(BTN_SAVE, g_state.stage_locked);
     hal_led_key(BTN_PLAY, g_state.playing ? (g_state.beat1_flash > 0u ? 0 : 1) : 0);
 }
 
@@ -129,12 +130,7 @@ void input_process(void)
     }
 
     if (press & (1u << BTN_SAVE)) {
-        if (g_state.playing) dsp_all_notes_off();
-        for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
-            g_state.settings.saved_slots[s] = g_state.slots[s];
-        }
-        hal_settings_save(&g_state.settings, sizeof(CastletuniaSaveBlob));
-        engine_set_ticker("> SAVED TO TOME!");
+        engine_toggle_stage_lock();
     }
 
     /* BTN_GLO: Hold+Encoder Shift vs Tap-Release SPELL: TOLL */

@@ -171,17 +171,48 @@ static void run_stage1(void)
     engine_spell_toll();
     assert(spy_toll_count == prev_toll + 1);
 
-    /* 6. Macro control mapping */
+    /* 6. Macro control mapping (defaults: 50, 25, 55, 60, 35) */
     engine_adjust_macro(ENC_ALGORITHM, 5, 0);
-    assert(g_state.settings.intensity == 60);
+    assert(g_state.settings.intensity == 70);
     engine_adjust_macro(ENC_KNOB1, 5, 0);
-    assert(g_state.settings.drift == 56);
+    assert(g_state.settings.drift == 45);
     engine_adjust_macro(ENC_KNOB2, 5, 0);
-    assert(g_state.settings.density == 72);
+    assert(g_state.settings.density == 75);
     engine_adjust_macro(ENC_KNOB3, 5, 0);
-    assert(g_state.settings.harmony == 76);
+    assert(g_state.settings.harmony == 80);
     engine_adjust_macro(ENC_KNOB4, 5, 0);
-    assert(g_state.settings.weave == 44);
+    assert(g_state.settings.weave == 55);
+
+    /* 7. Stage turn target (>= 8), Stage Lock, and all 9 zones auto-advance */
+    for (uint8_t z = 0; z < NUM_ZONES; z++) {
+        assert(engine_stage_turn_target(z) >= 8u);
+        engine_init_defaults();
+        engine_set_zone(z);
+        g_state.stage_locked = 0u;
+        uint8_t tgt = engine_stage_turn_target(z);
+        for (uint8_t t = 0; t < tgt; t++) {
+            uint8_t slot = t % 3u;
+            g_state.next_slot = slot;
+            engine_on_key_down(0);
+            engine_on_key_up(0);
+            seed_commit_capture();
+            assert(g_state.stage_turns <= tgt);
+        }
+        assert(g_state.stage_turns == tgt);
+        /* Tick through buildup (12 steps) + 1 curse bar (16 steps) + 1 victory bar (16 steps) */
+        for (int tick = 0; tick < 6 * 16 * 4; tick++) {
+            engine_tick_ppqn();
+            if (g_state.settings.zone_id == ((z + 1u) % NUM_ZONES)) break;
+        }
+        assert(g_state.settings.zone_id == ((z + 1u) % NUM_ZONES));
+        assert(g_state.stage_turns == 0u);
+    }
+    engine_init_defaults();
+    assert(g_state.stage_locked == 0u);
+    engine_toggle_stage_lock();
+    assert(g_state.stage_locked == 1u);
+    engine_toggle_stage_lock();
+    assert(g_state.stage_locked == 0u);
 
     printf("Stage 1 PASSED!\n");
 }
@@ -345,13 +376,16 @@ static void run_stage4(void)
     input_process();
     assert(g_state.next_slot != prev_slot);
 
-    /* 4. BTN_SAVE persistence */
-    g_state.settings.zone_id = 3;
+    /* 4. BTN_SAVE toggles Stage Lock + LED */
+    assert(g_state.stage_locked == 0u);
     mock_btn_press = (1u << BTN_SAVE);
     input_process();
-    CastletuniaSaveBlob loaded;
-    assert(hal_settings_load(&loaded, sizeof(loaded)) == 0);
-    assert(loaded.zone_id == 3);
+    assert(g_state.stage_locked == 1u);
+    assert(((mock_leds >> BTN_SAVE) & 1u) == 1u);
+    mock_btn_press = (1u << BTN_SAVE);
+    input_process();
+    assert(g_state.stage_locked == 0u);
+    assert(((mock_leds >> BTN_SAVE) & 1u) == 0u);
 
     /* 5. Key LEDs while paused = dim glow on root keys (0,7,14,21), bright on held keys */
     g_state.playing = 1;
