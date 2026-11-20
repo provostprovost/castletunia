@@ -1,0 +1,10 @@
+{
+  "what": "16-bit JRPG boss fights as a musical instrument. Play a riff on the keyboard and your three-hero party—Fighter, Cleric, and Sorceress—weaves it into a live fantasy battle soundtrack across nine pixel-art realms, while bosses wind up drum-roll counter-attacks that curse your beat, harmony, and screen. Shape the fight in real time with spell buttons and knobs.",
+  "author": "Brian Provost",
+  "kinds": ["groove", "synth"],
+  "cheat": "https://provostprovost.github.io/castletunia/",
+  "play": "https://joakimeriksson.github.io/fm1-emu/?package=https://provostprovost.github.io/castletunia/castletunia.fwsc&name=CASTLETUNIA&mhz=60",
+  "image": "docs/screenshots/splash.png",
+  "color": "#F59E0B",
+  "sounds": "none"
+}
