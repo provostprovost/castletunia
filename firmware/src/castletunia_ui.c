@@ -238,11 +238,20 @@ static void render_diorama_full(void)
             int vx = x + shake_x + rip;
             uint16_t c;
             if (slide_off > 0) {
-                int src_x = vx + (240 - slide_off);
-                if (src_x < 240) {
-                    c = sample_diorama_px(g_state.slide_prev_zone, src_x >> 1, sy, mirror);
+                if (g_state.slide_dir >= 0) {
+                    int src_x = vx + (240 - slide_off);
+                    if (src_x < 240) {
+                        c = sample_diorama_px(g_state.slide_prev_zone, src_x >> 1, sy, mirror);
+                    } else {
+                        c = sample_diorama_px(z, (src_x - 240) >> 1, sy, mirror);
+                    }
                 } else {
-                    c = sample_diorama_px(z, (src_x - 240) >> 1, sy, mirror);
+                    int src_x = vx - (240 - slide_off);
+                    if (src_x < 0) {
+                        c = sample_diorama_px(z, (src_x + 240) >> 1, sy, mirror);
+                    } else {
+                        c = sample_diorama_px(g_state.slide_prev_zone, src_x >> 1, sy, mirror);
+                    }
                 }
             } else {
                 c = apply_boss_atk_fx(sample_diorama_px(z, vx >> 1, sy, mirror), z);
@@ -426,7 +435,7 @@ void ui_render_splash(void)
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
     }
-    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v2.0.1", 0xFE60u, 0x0021u, 1);
+    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.0.1", 0xFE60u, 0x0021u, 1);
 }
 
 void ui_init(void)

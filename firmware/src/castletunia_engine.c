@@ -163,6 +163,14 @@ void engine_set_zone(uint8_t zone_id)
 {
     uint8_t z = (uint8_t)(zone_id % NUM_ZONES);
     if (z != g_state.settings.zone_id) {
+        int diff = (int)z - (int)g_state.settings.zone_id;
+        if (diff == 1 || diff == -(int)(NUM_ZONES - 1u)) {
+            g_state.slide_dir = 1;
+        } else if (diff == -1 || diff == (int)(NUM_ZONES - 1u)) {
+            g_state.slide_dir = -1;
+        } else {
+            g_state.slide_dir = (diff > 0) ? 1 : -1;
+        }
         g_state.slide_prev_zone = g_state.settings.zone_id;
         g_state.slide_frames = 12u;
         g_state.settings.zone_id = z;
