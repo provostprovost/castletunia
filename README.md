@@ -61,12 +61,12 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 |---|---|---|
 | **`MASTER`** | Hardware master output volume | Hardware master output volume |
 | **`SELECT`** | Switch Stage / Zone (`0`–`8`) | Shift Root Key (`C`–`B`) |
-| **`PRESETS`** | **Intensity** (`0%–100%`: percussion activity & FM grit) | Backing Chord / Drone Volume |
-| **`ALGORITHM`** | **Drift** (`0%–100%`: stepwise motif evolution per loop) | Fighter Volume |
-| **`KNOB1`** | **Density** (`0%–100%`: sparse thinning vs. passing-tone bloom) | Cleric Volume |
-| **`KNOB2`** | **Harmony** (`0%–100%`: chord progression richness & 3rd/5th pad) | Sorceress Volume |
-| **`KNOB3`** | **Weave** (`0%–100%`: harmonic/contrapuntal interaction `>=35%`, polyrhythm `>65%`) | Percussion Volume |
-| **`KNOB4`** | **Tempo** (`40–180 BPM`) | Reverb Override |
+| **`PRESETS`** | **Tempo** (`55–160 BPM`) | Backing Chord / Drone Volume |
+| **`ALGORITHM`** | **Intensity** (`0%–100%`: percussion activity & FM grit) | Reverb Override |
+| **`KNOB1`** | **Drift** (`0%–100%`: stepwise motif evolution per loop) | Fighter Volume |
+| **`KNOB2`** | **Density** (`0%–100%`: sparse thinning vs. passing-tone bloom) | Cleric Volume |
+| **`KNOB3`** | **Harmony** (`0%–100%`: chord progression richness & 3rd/5th pad) | Sorceress Volume |
+| **`KNOB4`** | **Weave** (`0%–100%`: harmonic/contrapuntal interaction `>=35%`, polyrhythm `>65%`) | Percussion Volume |
 
 ### Buttons
 
@@ -88,10 +88,10 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 
 ## "How Do I…" Quick Recipes
 
-- **Start a jam from silence:** Power on (the unit boots quiet with all 27 keys lit). Play any 1–16 note phrase on the keys and release—after ~0.85 s of silence, your character attacks with flying eighth-notes and the backing band kicks in on beat 1.
+- **Start a jam from silence:** Power on (the unit boots quiet onto a random stage with root keys glowing). Play any 1–16 note phrase on the keys and release—after ~0.85 s of silence, your character attacks with flying eighth-notes and the backing band kicks in on beat 1.
 - **Enter phrases smoothly while the band is playing:** Play notes for the active character; once you pause for ~0.75 s, the commit waits for the **next quarter-note beat** so your transition locks cleanly to the groove.
 - **Solo live over the band:** Freeze all three characters (`FX`, `SEL`, `ENV`) to enter **Live Jam Bypass**—the 27 keys play Sorceress live without overwriting any slots.
-- **Make rhythms polyrhythmic:** Turn **`KNOB3` (`Weave`)** past `65%` so Fighter (`7` steps), Cleric (`11` steps), and Sorceress (`13` steps) phase across each other.
+- **Make rhythms polyrhythmic:** Turn **`KNOB4` (`Weave`)** past `65%` so Fighter (`7` steps), Cleric (`11` steps), and Sorceress (`13` steps) phase across each other.
 
 ---
 
@@ -139,9 +139,9 @@ sh tests/run_host.sh tests/scripts/castletunia.txt
 
 | File | Role |
 |---|---|
-| `firmware/src/dinghy.c` | App entry, 3 s skippable boot splash, `app_audio` ISR, settings load, superloop |
-| `firmware/src/castletunia_engine.c` | Capture state machine, beat-locked transitions, 4-bar `A/B/A/C` arranger, Boss buildup & cooldowns, Spells |
-| `firmware/src/castletunia_dsp.c` | Pure 32-bit fixed-point Q15 FM voices, chord drone, FM percussion, Schroeder reverb, soft-clipper |
+| `firmware/src/dinghy.c` | App entry, 3 s skippable boot splash, random start stage, `app_audio` ISR, superloop |
+| `firmware/src/castletunia_engine.c` | Capture state machine, beat-locked transitions, 4-bar `A/B/A/C` arranger, auto-advance & Victory Fanfare, Boss buildup & cooldowns, Spells |
+| `firmware/src/castletunia_dsp.c` | Pure 32-bit fixed-point Q15 multi-engine synth (6 pad modes, 5 Party voice engines), FM percussion, Schroeder reverb, soft-clipper |
 | `firmware/src/castletunia_zones.c` | 9 Stage definitions (scales, chord progressions, BPMs, reverb, per-zone Party & percussion patches) |
 | `firmware/src/castletunia_input.c` | 27-key scanner, 7 macro encoders + `GLO` shift layer, 14 function buttons, key/button LEDs |
 | `firmware/src/castletunia_ui.c` | `240×240` 256-color boot splash, differential diorama/sprite renderer, flying note projectiles, HUD & ticker |
