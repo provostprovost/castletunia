@@ -9,8 +9,8 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 - **Three-Member RPG Party (3-Voice FM + Chords + Drums):** Play `1–16` note phrases on the monotonic 27-key scale keyboard. Fighter (brass/organ/lute/bass), Cleric (bell/harp/marimba/chime), and Sorceress (flute/strings/lead with vibrato) each launch flying eighth-notes (`♪`) at the Boss and weave your quantized melodies into a 4-bar `A / B / A / C` arrangement with backing chords and zone percussion.
 - **9 Contrasting Fantasy Stages:** Turn `SELECT` to scroll through 9 distinct pixel-art dioramas, scales, chord progressions, drum kits, and per-zone character timbres—from **The Crypt** and **The Tundra** to **Coronation** and **Boss**.
 - **Boss Counter-Attacks with 3-Beat Buildup:** Each Boss has its own turn cooldown (`3`, `4`, or `5` player turns). When ready, a **3-beat accelerating drum-roll buildup** (`> BOSS CHARGING!`) culminates on the beat in a tension chord sting, lunge animation, zone-tinted sine-wave ripple, and a unique **1-bar musical curse**.
-- **6 Tactile Spells & Zero-Menu Macro Controls:** Cast **Haste (`1.5×`)**, **Mirror** (flips Party & Boss + reverses step order), **Shatter** (crystalline SFX + pattern fracture), **Resolve** (`V → I` cadence), and **Toll** (zone boss bell), plus 7 one-knob-per-function encoders (`Intensity`, `Drift`, `Density`, `Harmony`, `Weave`, `BPM`).
-- **`240×240` 256-Color Boot Splash & Live Battle HUD:** Boots into a skippable 3-second pixel-art splash screen, then displays the live animated battle scene, per-character activity meters, status badges (`FRZ` / `HST` / `RDY`), and beat-synced battle ticker.
+- **Tactile Spells, Special Attacks & Stage Weather:** Cast **Haste (`1.5×`)**, **Mirror** (flips Party & Boss + reverses step order), **Character Special Attacks** (`OMNISLASH`, `PURIFY`, `METEOR`), **Stage Environment / Weather** (stage-specific visual particles, atmosphere tint & musical FX), and **Provoke Boss** (triggers the Boss's 3-beat buildup on demand), plus 7 one-knob-per-function encoders (`Intensity`, `Drift`, `Density`, `Harmony`, `Weave`, `BPM`).
+- **`240×240` 256-Color Boot Splash & Live Battle HUD:** Boots into a skippable 3-second pixel-art splash screen, then displays the live animated battle scene, per-character activity meters, status badges (`SLW` / `PSN` / `BSK` / `FRZ` / `HST` / `RDY`), and beat-synced battle ticker.
 
 | Boot Splash | 1 · The Crypt | 2 · The Tavern | 3 · The Tundra | 4 · The Sands |
 |---|---|---|---|---|
@@ -74,9 +74,9 @@ Turn your **M-VAVE FM-1** into a living 16-bit RPG boss battle where every music
 |---|---|
 | **`LFO`** | **Spell — Haste:** Toggles **`1.5×`** tempo for Cleric & Sorceress (`HST` badge; LED blinks). |
 | **`EDIT`** | **Spell — Mirror:** Flips Party to the left facing right & Boss to the right facing left, and reverses step order. |
-| **`ARP`** | **Spell — Shatter:** Plays a crystalline FM shatter burst, shakes the screen, and fractures unfrozen patterns (starts playback if paused). |
-| **`SEQ`** | **Spell — Resolve:** Flashes a gold border and arms a `V → I` cadence on the next chord/bar. |
-| **`GLO` (Tap)** | **Spell — Toll:** Rings the Zone's boss bell with an expanding white ring (starts playback if paused). |
+| **`ARP`** | **Special Attack (Ends Turn):** Fighter = **`OMNISLASH`** (power-octave flurry + shake); Cleric = **`PURIFY`** (chimes + halo ring + **cures all Party status effects**); Sorceress = **`METEOR`** (descending cascade + `22×22` fireball). Advances turn & Boss cooldown. |
+| **`SEQ`** | **Stage Environment Toggle (`ON/OFF`):** Adds a 25% stage-wide tint, 18 full-screen weather particles, and stage-specific musical FX (**Grave Mist**, **Ale Bubbles**, **Snowfall**, **Sandstorm**, **Fireflies**, **Crimson Rain**, **Confetti**, **Starfall**, **Embers**). Auto-clears on stage change. |
+| **`GLO` (Tap)** | **Provoke Boss:** Rings the Stage Boss bell and immediately launches the Boss's **3-beat drum-roll buildup & Counter-Attack** (`> BOSS PROVOKED!`). |
 | **`FX` / `SEL` / `ENV`** | **Cycle RPG Status** on Fighter / Cleric / Sorceress: `Clear` → **`SLW`** (turns into a **Sloth**, 2× length across 2 bars + chord-fit) → **`PSN`** (`vii` tension & decay) → **`BSK`** (octave/5th slashes, `125%` vel) → **`FRZ`** (mute & turn-skip). Flashes for **1 s** before audio kicks in so you can skip past states cleanly. |
 | **`HOME`** | Skip to the next unfrozen Party member without starting playback. |
 | **`REC` (Tap / Hold)** | **Tap:** Cancel recording or clear current character (`RDY`). **Hold 600 ms:** Clear all unfrozen characters. |

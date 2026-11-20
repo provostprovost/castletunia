@@ -75,6 +75,7 @@ static void update_leds(uint32_t now)
     hal_led_key(BTN_ENV, status_led_val(g_state.slots[2].status, now));
     hal_led_key(BTN_LFO, g_state.spells.haste_active ? (int)((now >> 6) & 1u) : 0);
     hal_led_key(BTN_EDIT, g_state.spells.mirror_active);
+    hal_led_key(BTN_SEQ, g_state.spells.resolve_armed);
     hal_led_key(BTN_PLAY, g_state.playing ? (g_state.beat1_flash > 0u ? 0 : 1) : 0);
 }
 

@@ -9,7 +9,7 @@
 #define DIORAMA_H 80
 #define SCREEN_W  240
 #define SCREEN_H  240
-#define NUM_PARTICLES 6
+#define NUM_PARTICLES 18
 
 typedef struct {
     int16_t x;
@@ -84,12 +84,20 @@ static int boss_atk_ripple_dx(int y)
 
 static uint16_t apply_boss_atk_fx(uint16_t c, uint8_t z)
 {
-    if (g_state.boss_atk_timer == 0u) return c;
-    uint16_t tint = boss_atk_tint(z);
-    if (g_state.boss_atk_timer > 28u && (g_state.boss_atk_timer & 2u)) {
-        c ^= 0x39E7u;
+    if (g_state.boss_atk_timer > 0u) {
+        uint16_t tint = boss_atk_tint(z);
+        if (g_state.boss_atk_timer > 28u && (g_state.boss_atk_timer & 2u)) {
+            c ^= 0x39E7u;
+        }
+        return (uint16_t)(((c & 0xF7DEu) >> 1) + ((tint & 0xF7DEu) >> 1));
     }
-    return (uint16_t)(((c & 0xF7DEu) >> 1) + ((tint & 0xF7DEu) >> 1));
+    if (g_state.spells.resolve_armed) {
+        uint16_t tint = boss_atk_tint(z);
+        /* 25% stage-wide weather atmosphere tint */
+        uint16_t half = (uint16_t)(((c & 0xF7DEu) >> 1) + ((tint & 0xF7DEu) >> 1));
+        return (uint16_t)(((c & 0xF7DEu) >> 1) + ((half & 0xF7DEu) >> 1));
+    }
+    return c;
 }
 
 static void render_battle_sprites(void)
@@ -305,8 +313,8 @@ static void render_particles(void)
         restore_diorama_4x4(z, g_particles[i].x, g_particles[i].y, mirror);
         g_particles[i].x += g_particles[i].vx;
         g_particles[i].y += g_particles[i].vy;
-        if (g_particles[i].x < 4) g_particles[i].x = 136;
-        if (g_particles[i].x > 138) g_particles[i].x = 6;
+        if (g_particles[i].x < 4) g_particles[i].x = 232;
+        if (g_particles[i].x > 234) g_particles[i].x = 6;
         if (g_particles[i].y < 4) g_particles[i].y = 152;
         if (g_particles[i].y > 154) g_particles[i].y = 6;
         for (int j = 0; j < 4; j++) g_patch_buf[j] = pcol;
@@ -471,14 +479,14 @@ void ui_render_splash(void)
         }
         hal_lcd_blit_rect(0, y, 240, 1, g_scanline);
     }
-    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.1.1", 0xFE60u, 0x0021u, 1);
+    hal_draw_text(8, 224, 224, "BRIAN PROVOST  v1.2.0", 0xFE60u, 0x0021u, 1);
 }
 
 void ui_init(void)
 {
     for (int i = 0; i < NUM_PARTICLES; i++) {
-        g_particles[i].x = (int16_t)(12 + i * 20);
-        g_particles[i].y = (int16_t)(16 + (i * 23) % 120);
+        g_particles[i].x = (int16_t)(8 + ((i * 15) % 220));
+        g_particles[i].y = (int16_t)(10 + ((i * 29) % 136));
         g_particles[i].vx = (i & 1) ? 1 : -1;
         g_particles[i].vy = 1;
     }
@@ -555,6 +563,131 @@ static void render_note_projectiles(void)
     }
 }
 
+static void render_meteor(void)
+{
+    if (g_state.meteor_timer == 0u) return;
+    uint8_t z = g_state.settings.zone_id % 9u;
+    uint8_t mirror = g_state.spells.mirror_active;
+    int t = 20 - (int)g_state.meteor_timer; /* 0..19 */
+    int mx = mirror ? (24 + t * 8) : (200 - t * 8);
+    int my = 4 + t * 3;
+    for (int r = 0; r < 22; r++) {
+        for (int c = 0; c < 22; c++) {
+            int xx = mx + c, yy = my + r;
+            uint16_t bg = (xx >= 0 && xx < 240 && yy >= 0 && yy < 160)
+                        ? apply_boss_atk_fx(sample_diorama_px(z, xx >> 1, yy >> 1, mirror), z)
+                        : 0u;
+            int dx = c - 11, dy = r - 11;
+            int d2 = dx * dx + dy * dy;
+            uint16_t col = bg;
+            if (d2 <= 16) col = 0xFFFFu;       /* blazing white-hot core */
+            else if (d2 <= 42) col = 0xFFE0u;  /* bright yellow */
+            else if (d2 <= 80) col = 0xFC00u;  /* fiery orange */
+            else if (d2 <= 115) col = 0xF800u; /* crimson fireball */
+            g_sprite_buf[r * 22 + c] = col;
+        }
+    }
+    if (mx >= 0 && mx <= 218 && my >= 0 && my <= 138) {
+        hal_lcd_blit_rect(mx, my, 22, 22, g_sprite_buf);
+    }
+}
+
+static void render_env_particles(void)
+{
+    if (!g_state.spells.resolve_armed) return;
+    uint8_t z = g_state.settings.zone_id % 9u;
+    uint8_t sg = zone_get(z)->subgenre_id % 9u;
+    uint8_t mirror = g_state.spells.mirror_active;
+
+    static const uint16_t ENV_COLS[9] = {
+        0xDF9Fu, /* 0 Crypt: Grave Mist (bright spectral mist) */
+        0xFFE0u, /* 1 Tavern: Ale Bubbles (bright golden amber) */
+        0xAFE0u, /* 2 Glade: Fireflies (bright glowing lime-gold) */
+        0xF800u, /* 3 Castle: Crimson Rain (bright blood red) */
+        0xFD20u, /* 4 Sands: Sandstorm (bright gold sand) */
+        0x07FFu, /* 5 Spire: Starfall (arcane cyan) */
+        0xFFFFu, /* 6 Tundra: Snowfall (crisp snow white) */
+        0xFE60u, /* 7 Coronation: Confetti (royal gold) */
+        0xFC00u  /* 8 Boss: Embers (fiery orange) */
+    };
+    static const int8_t ENV_VX[9] = {  2,  0,  1, -1,  6, -2,  2,  1,  1 };
+    static const int8_t ENV_VY[9] = {  0, -3, -1,  5,  1,  4,  3,  3, -4 };
+
+    uint16_t col = ENV_COLS[sg];
+    for (int i = 0; i < NUM_PARTICLES; i++) {
+        int ox = (int)g_particles[i].x;
+        int oy = (int)g_particles[i].y;
+        /* Erase old 7x7 particle footprint cleanly */
+        for (int r = 0; r < 7; r++) {
+            for (int c = 0; c < 7; c++) {
+                int xx = ox + c, yy = oy + r;
+                g_sprite_buf[r * 7 + c] = (xx >= 0 && xx < 240 && yy >= 0 && yy < 160)
+                    ? apply_boss_atk_fx(sample_diorama_px(z, xx >> 1, yy >> 1, mirror), z)
+                    : 0u;
+            }
+        }
+        if (ox >= 0 && ox <= 233 && oy >= 0 && oy <= 153) {
+            hal_lcd_blit_rect(ox, oy, 7, 7, g_sprite_buf);
+        }
+
+        int vx = (int)ENV_VX[sg];
+        int vy = (int)ENV_VY[sg];
+        if (sg == 2u) {
+            /* Glade Fireflies: drift slowly every 2nd frame and blink on/off slowly per particle */
+            if ((g_boss_phase & 1u) != 0u) { vx = 0; vy = 0; }
+            else if (i & 1) vx = -vx;
+        } else if (sg == 7u || sg == 8u) {
+            if (i & 1) vx = -vx;
+        }
+        ox += vx;
+        oy += vy;
+        if (ox < 2) ox = 230;
+        if (ox > 231) ox = 4;
+        if (oy < 4) oy = 146;
+        if (oy > 148) oy = 6;
+        g_particles[i].x = (int16_t)ox;
+        g_particles[i].y = (int16_t)oy;
+
+        if (sg == 2u) {
+            uint8_t blink = (uint8_t)((g_boss_phase + (uint8_t)(i * 23u)) & 63u);
+            if (blink >= 22u) continue; /* off for ~2/3 of cycle, slow staggered glow */
+        }
+
+        uint16_t pcol = (sg == 7u && (i & 1)) ? 0xFFFFu : ((sg == 5u && (i & 1)) ? 0xF81Fu : col);
+        for (int r = 0; r < 7; r++) {
+            for (int c = 0; c < 7; c++) {
+                int xx = ox + c, yy = oy + r;
+                uint16_t bg = (xx >= 0 && xx < 240 && yy >= 0 && yy < 160)
+                            ? apply_boss_atk_fx(sample_diorama_px(z, xx >> 1, yy >> 1, mirror), z)
+                            : 0u;
+                uint8_t on = 0u;
+                uint16_t dc = pcol;
+                if (sg == 1u) { /* 7x7 bubble ring + bright white shine */
+                    int dx = c - 3, dy = r - 3;
+                    int d2 = dx * dx + dy * dy;
+                    if (d2 >= 5 && d2 <= 10) on = 1u;
+                    if (r == 2 && c == 2) { on = 1u; dc = 0xFFFFu; }
+                } else if (sg == 0u || sg == 4u) { /* bold 7x2 mist / sand streak */
+                    on = (r >= 2 && r <= 3) ? 1u : 0u;
+                } else if (sg == 3u) { /* bold 2x7 crimson rain streak */
+                    on = (c >= 2 && c <= 3) ? 1u : 0u;
+                } else if (sg == 5u || sg == 6u) { /* 7x7 star / snowflake cross + center */
+                    on = (r == 3 || c == 3 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) ? 1u : 0u;
+                } else { /* glowing 5x5 orb with bright white core for fireflies / confetti / embers */
+                    int dx = c - 3, dy = r - 3;
+                    int d2 = dx * dx + dy * dy;
+                    if (d2 <= 1) { on = 1u; dc = 0xFFFFu; }
+                    else if (d2 <= 5) on = 1u;
+                }
+                g_sprite_buf[r * 7 + c] = on ? dc : bg;
+            }
+        }
+        if (ox >= 0 && ox <= 233 && oy >= 0 && oy <= 153) {
+            hal_lcd_blit_rect(ox, oy, 7, 7, g_sprite_buf);
+        }
+    }
+}
+
 void ui_render(void)
 {
     if (!g_hud_frame_drawn || g_state.spells.haste_active != g_last_haste) {
@@ -567,25 +700,41 @@ void ui_render(void)
     }
 
     if (g_state.dirty_diorama || g_state.slide_frames > 0u || g_state.shake_timer > 0u ||
-        g_state.toll_ring_timer > 0u || g_state.boss_atk_timer > 0u) {
+        g_state.toll_ring_timer > 0u || g_state.meteor_timer > 0u || g_state.boss_atk_timer > 0u) {
         render_diorama_full();
         if (g_state.slide_frames == 0u) {
+            render_env_particles();
             render_battle_sprites();
             render_note_projectiles();
+            render_meteor();
         }
         g_state.dirty_diorama = 0u;
         if (g_state.slide_frames > 0u) {
             g_state.slide_frames--;
             if (g_state.slide_frames == 0u) g_state.dirty_diorama = 1u;
         }
-        if (g_state.shake_timer > 0u) g_state.shake_timer--;
-        if (g_state.toll_ring_timer > 0u) g_state.toll_ring_timer--;
+        if (g_state.shake_timer > 0u) {
+            g_state.shake_timer--;
+            if (g_state.shake_timer == 0u) g_state.dirty_diorama = 1u;
+        }
+        if (g_state.toll_ring_timer > 0u) {
+            g_state.toll_ring_timer--;
+            if (g_state.toll_ring_timer == 0u) g_state.dirty_diorama = 1u;
+        }
+        if (g_state.meteor_timer > 0u) {
+            g_state.meteor_timer--;
+            if (g_state.meteor_timer == 0u) g_state.dirty_diorama = 1u;
+        }
         if (g_state.boss_atk_timer > 0u) {
             g_state.boss_atk_timer--;
             if (g_state.boss_atk_timer == 0u) g_state.dirty_diorama = 1u;
         }
     } else {
-        render_particles();
+        if (g_state.spells.resolve_armed) {
+            render_env_particles();
+        } else {
+            render_particles();
+        }
         g_boss_phase++;
         render_battle_sprites();
         render_note_projectiles();

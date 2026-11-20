@@ -112,6 +112,9 @@ static void update_drone_pitch(void)
     uint8_t fifth_iv = (uint8_t)((fifth_off + 12u - z->scale_semitones[d]) % 12u);
 
     uint8_t root = (uint8_t)(48u + root_off);
+    if (g_state.spells.resolve_armed && (z->subgenre_id % 9u) == 0u) {
+        root = (uint8_t)(36u + root_off); /* Crypt Grave Mist: deep sub-octave drone */
+    }
     uint8_t third = (uint8_t)(root + third_iv + 12u); /* Upper-octave voicing so chord changes cut through */
     uint8_t fifth = (uint8_t)(root + fifth_iv + 12u);
     uint8_t fifth_en = (g_state.settings.harmony >= 20u) ? 1u : 0u;
@@ -173,6 +176,7 @@ void engine_set_zone(uint8_t zone_id)
         }
         g_state.slide_prev_zone = g_state.settings.zone_id;
         g_state.slide_frames = 12u;
+        g_state.spells.resolve_armed = 0u;
         g_state.settings.zone_id = z;
         g_state.settings.bpm = G_ZONES[z].default_bpm;
         g_state.dirty_diorama = 1u;
@@ -543,35 +547,91 @@ void engine_spell_mirror_toggle(void)
 
 void engine_spell_shatter(void)
 {
+    /* Character Special Attack / Limit Break for active Party member (advances turn) */
+    uint8_t s = g_state.next_slot;
+    if (g_state.slots[s].frozen) s = find_next_unfrozen_slot(s);
+    if (g_state.slots[s].frozen) {
+        engine_set_ticker("> ALL PARTY FROZEN");
+        return;
+    }
+
     g_state.playing = 1u;
-    dsp_shatter_sfx();
-    for (uint8_t s = 0; s < NUM_PARTY_SLOTS; s++) {
-        if (!g_state.slots[s].frozen && g_state.slots[s].note_count > 0u) {
-            SeedSlot tmp = g_state.slots[s];
-            for (uint8_t k = 0; k < 3u; k++) {
-                apply_drift_to_slot(&tmp, 80u);
-            }
-            uint8_t len = tmp.base_length ? tmp.base_length : 16u;
-            for (uint8_t i = 1u; i < tmp.note_count; i++) {
-                tmp.step_pos[i] = (uint8_t)((tmp.step_pos[i] + 3u) % len);
-            }
-            tmp.anim_timer = 10u;
-            g_state.staging_slots[s] = tmp;
-            g_state.slot_pending[s] = 1u;
+    g_state.attack_timer[s] = 15u;
+    g_state.boss_hit_timer = 12u;
+    g_state.slots[s].anim_timer = 10u;
+
+    int32_t root_deg = (int32_t)g_state.active_chord_deg;
+    if (s == 0u) {
+        /* Fighter: OMNISLASH! Ascending power-octave sword flurry + shake */
+        static const int32_t SLASH[4] = {0, 4, 7, 11};
+        for (uint8_t i = 0; i < 4u; i++) {
+            dsp_note_on(0u, engine_note_for_degree(root_deg + SLASH[i], 0u), 32767u, 10u);
+        }
+        dsp_perc_trigger(1u, 32000u);
+        g_state.shake_timer = 10u;
+        g_state.shake_amp = 4u;
+        engine_set_ticker("> FIGHTER: OMNISLASH!");
+    } else if (s == 1u) {
+        /* Cleric: PURIFY! Ascending chime arpeggio + halo ring + cures all Party statuses */
+        static const int32_t CHIME[4] = {0, 4, 7, 14};
+        for (uint8_t i = 0; i < 4u; i++) {
+            dsp_note_on(1u, engine_note_for_degree(root_deg + CHIME[i], 1u), 32767u, 14u);
+        }
+        for (uint8_t p = 0; p < NUM_PARTY_SLOTS; p++) {
+            g_state.slots[p].status = STATUS_NONE;
+            g_state.slots[p].audio_status = STATUS_NONE;
+            g_state.slots[p].frozen = 0u;
+        }
+        g_state.toll_ring_timer = 14u;
+        g_state.gold_flash_timer = 12u;
+        engine_set_ticker("> CLERIC: PURIFY!");
+    } else {
+        /* Sorceress: METEOR! Descending arcane cascade + impact boom */
+        static const int32_t METEOR[4] = {14, 11, 7, 4};
+        for (uint8_t i = 0; i < 4u; i++) {
+            dsp_note_on(2u, engine_note_for_degree(root_deg + METEOR[i], 2u), 32767u, 12u);
+        }
+        dsp_perc_trigger(0u, 32000u);
+        g_state.meteor_timer = 20u;
+        g_state.shake_timer = 14u;
+        g_state.shake_amp = 4u;
+        g_state.gold_flash_timer = 12u;
+        engine_set_ticker("> SORCERESS: METEOR!");
+    }
+
+    /* Special Attack ends the turn and advances Boss cooldown */
+    g_state.next_slot = find_next_unfrozen_slot((uint8_t)((s + 1u) % NUM_PARTY_SLOTS));
+    if (g_state.slots[0].note_count > 0u && g_state.slots[1].note_count > 0u && g_state.slots[2].note_count > 0u) {
+        static const uint8_t BOSS_CD[9] = { 4u, 4u, 5u, 3u, 3u, 4u, 4u, 4u, 5u };
+        uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
+        g_state.boss_turn_cnt++;
+        if (g_state.boss_turn_cnt >= BOSS_CD[sg]) {
+            g_state.boss_turn_cnt = 0u;
+            g_state.boss_buildup_steps = 12u;
         }
     }
-    g_state.shake_timer = 8u;
-    g_state.shake_amp = 2u;
     g_state.dirty_diorama = 1u;
     g_state.dirty_party = 1u;
-    engine_set_ticker("> CAST SHATTER!");
 }
 
 void engine_spell_resolve(void)
 {
-    g_state.spells.resolve_armed = 1u;
-    g_state.gold_flash_timer = 10u;
-    engine_set_ticker("> CAST RESOLVE!");
+    /* Stage Environment / Weather toggle (ON/OFF) */
+    static const char *const ENV_NAMES[9] = {
+        "> ENV: GRAVE MIST", "> ENV: ALE BUBBLES", "> ENV: FIREFLIES",
+        "> ENV: CRIMSON RAIN", "> ENV: SANDSTORM", "> ENV: STARFALL",
+        "> ENV: SNOWFALL", "> ENV: CONFETTI", "> ENV: EMBERS"
+    };
+    g_state.spells.resolve_armed ^= 1u;
+    uint8_t sg = zone_get(g_state.settings.zone_id)->subgenre_id % 9u;
+    g_state.dirty_diorama = 1u;
+    update_drone_pitch();
+    if (g_state.spells.resolve_armed) {
+        dsp_note_on(1u, engine_note_for_degree((int32_t)g_state.active_chord_deg + 7, 1u), 28000u, 10u);
+        engine_set_ticker(ENV_NAMES[sg]);
+    } else {
+        engine_set_ticker("> ENV: CLEAR");
+    }
 }
 
 void engine_spell_conjure(void)
@@ -653,11 +713,14 @@ void engine_spell_conjure(void)
 
 void engine_spell_toll(void)
 {
+    /* Provoke Boss: immediately triggers the Stage Boss's 3-beat drum buildup & Counter-Attack */
     g_state.playing = 1u;
     dsp_toll_trigger(g_state.settings.zone_id, engine_drone_root_midi());
+    g_state.boss_buildup_steps = 12u;
+    g_state.boss_turn_cnt = 0u;
     g_state.toll_ring_timer = 14u;
     g_state.dirty_diorama = 1u;
-    engine_set_ticker("> CAST TOLL!");
+    engine_set_ticker("> BOSS PROVOKED!");
 }
 
 void engine_adjust_macro(uint8_t enc_id, int32_t delta, uint8_t glo_held)
@@ -830,8 +893,8 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                 break;
             }
         }
-        /* Density blooming (65..100%) or Berserk slashes on anchored beats/8ths */
-        if (deg < 0 && (eff_density >= 65u || ast == STATUS_BERSERK)) {
+        /* Density blooming (65..100%), Berserk slashes, or SEQ Environment fills on anchored 8ths */
+        if (deg < 0 && (eff_density >= 65u || ast == STATUS_BERSERK || (g_state.spells.resolve_armed && (pos & 1u) == 0u))) {
             uint8_t allow_bloom = ((pos & 1u) == 0u) || (boss_active && zc == 2u);
             if (!allow_bloom) {
                 /* Odd 16th (e or a): only allow if this beat already has an anchor on 1 or & */
@@ -845,15 +908,17 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
                     }
                 }
             }
+            uint8_t env_fill = (g_state.spells.resolve_armed && s >= 1u && (zc == 1u || zc == 2u || zc == 5u)) ? 65u : 0u;
             uint8_t chance = (boss_active && zc == 2u) ? 55u
-                           : ((ast == STATUS_BERSERK) ? 45u : (uint8_t)(eff_density - 58u));
+                           : ((ast == STATUS_BERSERK) ? 45u
+                           : (env_fill > 0u ? env_fill : (uint8_t)(eff_density - 58u)));
             if (allow_bloom && (engine_prng() % 100u) < chance) {
                 static const int8_t ORN[3] = {1, -1, 2};
                 static const int8_t OVERGROW[3] = {2, 4, 7};
                 int8_t base = sl->scale_deg[0];
                 if (base >= 0) {
                     deg = base + ((boss_active && zc == 2u) ? OVERGROW[engine_prng() % 3u] : ORN[engine_prng() % 3u]);
-                    vel_pct = (boss_active && zc == 2u) ? 85u : 65u;
+                    vel_pct = (boss_active && zc == 2u) ? 85u : 75u;
                 }
             }
         }
@@ -928,6 +993,19 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
     if (g_state.cross_accent_bars[s] > 0u) {
         vel_pct = 120u;
         if ((engine_prng() % 100u) < 35u) deg += 7;
+    }
+
+    /* Stage Environment / Weather musical effects when SEQ toggle is ON */
+    if (g_state.spells.resolve_armed) {
+        if (zc == 0u && (s == 0u || s == 2u)) deg -= 7;                  /* Crypt Grave Mist: deep sub-octave */
+        else if (zc == 1u && s >= 1u) { deg += ((step & 2u) ? 4 : 2); vel_pct = 115u; } /* Tavern Ale Bubbles */
+        else if (zc == 2u && s >= 1u) { deg += 7; vel_pct = 115u; }        /* Glade Fireflies: +1 oct shimmer */
+        else if (zc == 3u && (step == 4u || step == 12u)) { deg += 4; vel_pct = 125u; } /* Castle Crimson Rain */
+        else if (zc == 4u && (step & 2u) != 0u) deg += 1;                  /* Sands Sandstorm: bII tension */
+        else if (zc == 5u && s >= 1u) deg += ((step & 2u) ? 14 : 7);      /* Spire Starfall: +1/+2 oct cascades */
+        else if (zc == 6u && s >= 1u) deg += 7;                           /* Tundra Snowfall: +1 oct crystal */
+        else if (zc == 7u && s == 2u) { deg += 7; vel_pct = 120u; }        /* Coronation Confetti: royal brass lift */
+        else if (zc == 8u) { if ((step & 2u) == 0u) deg += 7; vel_pct = 130u; } /* Boss Embers: shred octaves */
     }
 
     /* Per-character RPG Status Effect DSP modifiers (applied dynamically; leaves stored riff intact) */
@@ -1041,12 +1119,10 @@ void engine_tick_ppqn(void)
         const ZoneDef *z = zone_get(g_state.settings.zone_id);
         uint8_t bar_idx = g_state.bar_count & 3u;
         uint8_t prev_chord = g_state.active_chord_deg;
-        if (g_state.spells.resolve_armed) {
-            g_state.active_chord_deg = (step < 8u) ? 4u : 0u;
-        } else if (g_state.boss_curse_bars > 0u && ((z->subgenre_id == 4u) || (z->subgenre_id == 8u) || (z->subgenre_id == 0u))) {
-            g_state.active_chord_deg = 1u; /* Dramatic bII Phrygian/Doom tension */
-        } else if (g_state.boss_curse_bars > 0u && z->subgenre_id == 7u) {
+        if (g_state.boss_curse_bars > 0u && z->subgenre_id == 7u) {
             g_state.active_chord_deg = (step < 8u) ? 3u : 4u; /* Seraph IV->V fanfare */
+        } else if (g_state.spells.resolve_armed && z->subgenre_id == 7u && bar_idx == 3u) {
+            g_state.active_chord_deg = (step < 8u) ? 3u : 4u; /* Coronation Confetti IV->V lift */
         } else if (g_state.settings.harmony >= 70u) {
             g_state.active_chord_deg = z->high_prog[bar_idx];
         } else if (g_state.settings.harmony >= 15u) {
@@ -1098,6 +1174,14 @@ void engine_tick_ppqn(void)
                 }
             }
             if (dens < 25u) high_mask = 0u;
+            if (g_state.spells.resolve_armed) {
+                uint8_t sg = z->subgenre_id % 9u;
+                if (sg == 0u) low_mask |= 0x0101u;       /* Crypt Grave Mist: low beat 1 & 3 boom */
+                else if (sg == 3u) high_mask |= 0x1010u; /* Castle Crimson Rain: Beat 2 & 4 stabs */
+                else if (sg == 4u) high_mask |= 0xAAAAu; /* Sands Sandstorm: continuous shaker */
+                else if (sg == 7u) high_mask |= 0x5555u; /* Coronation Confetti: snare march */
+                else if (sg == 8u) { low_mask |= 0x5555u; high_mask |= 0x5555u; } /* Boss Embers: double-kick */
+            }
             uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 200u);
             if (low_mask & (1u << step)) dsp_perc_trigger(0u, vel);
             if (high_mask & (1u << step)) dsp_perc_trigger(1u, vel);
@@ -1161,9 +1245,6 @@ void engine_tick_ppqn(void)
         if (g_state.step_16th >= 16u) {
             g_state.step_16th = 0u;
             g_state.bar_count++;
-            if (g_state.spells.resolve_armed) {
-                g_state.spells.resolve_armed = 0u;
-            }
             if (g_state.boss_curse_bars > 0u) {
                 g_state.boss_curse_bars--;
                 if (g_state.boss_curse_bars == 0u) {

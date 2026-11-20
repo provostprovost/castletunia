@@ -166,6 +166,7 @@ typedef struct {
     uint8_t           shake_timer;
     uint8_t           shake_amp;
     uint8_t           toll_ring_timer;
+    uint8_t           meteor_timer;
     uint8_t           gold_flash_timer;
     uint8_t           slide_frames;
     uint8_t           slide_prev_zone;
