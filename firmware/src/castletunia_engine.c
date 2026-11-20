@@ -177,6 +177,7 @@ void engine_set_zone(uint8_t zone_id)
         g_state.slide_prev_zone = g_state.settings.zone_id;
         g_state.slide_frames = 12u;
         g_state.spells.resolve_armed = 0u;
+        g_state.env_steps = 0u;
         g_state.settings.zone_id = z;
         g_state.settings.bpm = G_ZONES[z].default_bpm;
         g_state.dirty_diorama = 1u;
@@ -627,9 +628,11 @@ void engine_spell_resolve(void)
     g_state.dirty_diorama = 1u;
     update_drone_pitch();
     if (g_state.spells.resolve_armed) {
+        g_state.env_steps = 32u; /* Auto-clear after 2 full measures (32 16th-note steps) */
         dsp_note_on(1u, engine_note_for_degree((int32_t)g_state.active_chord_deg + 7, 1u), 28000u, 10u);
         engine_set_ticker(ENV_NAMES[sg]);
     } else {
+        g_state.env_steps = 0u;
         engine_set_ticker("> ENV: CLEAR");
     }
 }
@@ -1135,6 +1138,14 @@ void engine_tick_ppqn(void)
         }
 
         if (step == 0u) g_state.beat1_flash = 4u;
+        if (g_state.spells.resolve_armed && g_state.env_steps > 0u) {
+            g_state.env_steps--;
+            if (g_state.env_steps == 0u) {
+                g_state.spells.resolve_armed = 0u;
+                g_state.dirty_diorama = 1u;
+                update_drone_pitch();
+            }
+        }
         if ((step & 3u) == 0u && g_state.ticker_timer > 0u) {
             g_state.ticker_timer--;
             if (g_state.ticker_timer == 0u) g_state.dirty_ticker = 1u;

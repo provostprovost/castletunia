@@ -41,14 +41,17 @@ typedef enum {
 typedef struct {
     uint32_t phase_c;
     uint32_t phase_m;
+    uint32_t phase_det;
     uint32_t inc_c;
     uint32_t inc_m;
     int32_t  prev_mod;
+    int32_t  lpf_state;
     int32_t  env_q15;
     int32_t  target_env;
     int32_t  attack_step;
     int32_t  vel_q15;
     uint16_t gate_ticks;
+    uint16_t atk_cnt;
     uint8_t  stage;
     uint8_t  quick_rel;
     uint8_t  env_div;
@@ -67,8 +70,8 @@ static FmVoice   g_party[NUM_PARTY_SLOTS];
 static FmVoice   g_toll;
 static PercVoice g_perc[2];
 
-/* Atmospheric Backing Chord Pad state (Root + 3rd + 5th) */
-static uint32_t g_drone_ph1 = 0u, g_drone_ph2 = 0u, g_drone_ph3 = 0u;
+/* Atmospheric Backing Chord Pad state (Root + 3rd + 5th + detuned Root) */
+static uint32_t g_drone_ph1 = 0u, g_drone_ph1b = 0u, g_drone_ph2 = 0u, g_drone_ph3 = 0u;
 static uint32_t g_drone_inc1 = 0u, g_drone_inc2 = 0u, g_drone_inc3 = 0u;
 static uint32_t g_drone_lfo_ph = 0u;
 static int32_t  g_drone_lpf = 0;
@@ -76,8 +79,32 @@ static uint8_t  g_drone_third_en = 0u;
 static uint8_t  g_drone_fifth_en = 0u;
 static int32_t  g_drone_level_q15 = 0;
 
-/* 16-bit Galois LFSR for percussion noise */
+/* 16-bit Galois LFSR for percussion, pluck pick transient, and woodwind breath */
 static uint16_t g_lfsr = 0xACE1u;
+
+static inline int32_t lfsr_noise_q15(void)
+{
+    uint16_t lsb = g_lfsr & 1u;
+    g_lfsr >>= 1;
+    if (lsb) g_lfsr ^= 0xB400u;
+    return (g_lfsr & 1u) ? 24000 : -24000;
+}
+
+static inline int32_t saw_q15(uint32_t ph)
+{
+    return (int32_t)(ph >> 16) - 32768;
+}
+
+static inline int32_t tri_q15(uint32_t ph)
+{
+    int32_t s = (int32_t)(ph >> 16) - 32768;
+    return ((s < 0) ? -s : s) * 2 - 32768;
+}
+
+static inline int32_t sq_q15(uint32_t ph)
+{
+    return (ph < 0x80000000u) ? 24576 : -24576;
+}
 
 /* 4-Comb + 2-Allpass Schroeder Room Reverb (~8.7 KB static SRAM) */
 #define COMB0_LEN 743u
@@ -153,6 +180,7 @@ static void start_fm_voice(FmVoice *v, const FmPatch *p, uint8_t midi_note, uint
     v->stage = ENV_ATK;
     v->quick_rel = 0u;
     v->env_div = 0u;
+    v->atk_cnt = 0u;
 }
 
 void dsp_note_on(uint8_t slot, uint8_t midi_note, uint16_t vel_q15, uint16_t gate_ticks)
@@ -183,9 +211,9 @@ void dsp_toll_trigger(uint8_t zone_id, uint8_t root_midi)
 void dsp_attack_sfx(uint8_t slot)
 {
     static const FmPatch ATK_SFX[3] = {
-        {7, 2, 36000, 10000, 64, 31500, 0, 29000}, /* Fighter: crisp metallic sword slash */
-        {5, 2, 28000,  2000, 64, 32350, 0, 31000}, /* White Mage: bright Holy bell chime */
-        {3, 1, 44000,  8000, 64, 32100, 0, 30000}  /* Red Sorceress: arcane Flare burst */
+        {7, 2, 36000, 10000, 64, 31500, 0, 29000, VOICE_FM}, /* Fighter: crisp metallic sword slash */
+        {5, 2, 28000,  2000, 64, 32350, 0, 31000, VOICE_FM}, /* White Mage: bright Holy bell chime */
+        {3, 1, 44000,  8000, 64, 32100, 0, 30000, VOICE_FM}  /* Red Sorceress: arcane Flare burst */
     };
     static const uint8_t NOTES[3] = { 62u, 79u, 74u };
     uint8_t s = slot % 3u;
@@ -195,15 +223,15 @@ void dsp_attack_sfx(uint8_t slot)
 void dsp_boss_attack_sfx(uint8_t zone_id)
 {
     static const FmPatch BOSS_SFX[9] = {
-        {1, 2, 50000,  4000, 64, 32600, 4, 24000}, /* 0 Crypt (Lich): deep doom toll */
-        {9, 2, 46000, 14000, 64, 31600, 0, 29000}, /* 1 Tavern (Mimic): crunching brawl snap */
-        {4, 3, 38000,  8000, 64, 32300, 3, 27000}, /* 2 Glade (Treant): woody overgrow chime */
-        {3, 2, 52000, 10000, 64, 32400, 5, 28000}, /* 3 Castle (Vampire): dark blood moon organ */
-        {11, 2, 42000, 12000, 64, 32100, 6, 26000}, /* 4 Sands (Anubis): metallic sandstorm */
-        {7, 5, 56000,  6000, 64, 32450, 8, 25000}, /* 5 Spire (Beholder): alien warp beam */
-        {5, 4, 48000,  3000, 64, 32550, 2, 26000}, /* 6 Tundra (Wyrm): crystalline frost shatter */
-        {2, 1, 34000,  2000, 64, 32450, 2, 29000}, /* 7 Coronation (Seraph): radiant judgment brass */
-        {13, 3, 60000, 16000, 64, 32500, 0, 22000} /* 8 Chaos (Demon): meteor impact */
+        {1, 2, 50000,  4000, 64, 32600, 4, 24000, VOICE_FM}, /* 0 Crypt (Lich): deep doom toll */
+        {9, 2, 46000, 14000, 64, 31600, 0, 29000, VOICE_FM}, /* 1 Tavern (Mimic): crunching brawl snap */
+        {4, 3, 38000,  8000, 64, 32300, 3, 27000, VOICE_FM}, /* 2 Glade (Treant): woody overgrow chime */
+        {3, 2, 52000, 10000, 64, 32400, 5, 28000, VOICE_FM}, /* 3 Castle (Vampire): dark blood moon organ */
+        {11, 2, 42000, 12000, 64, 32100, 6, 26000, VOICE_FM}, /* 4 Sands (Anubis): metallic sandstorm */
+        {7, 5, 56000,  6000, 64, 32450, 8, 25000, VOICE_FM}, /* 5 Spire (Beholder): alien warp beam */
+        {5, 4, 48000,  3000, 64, 32550, 2, 26000, VOICE_FM}, /* 6 Tundra (Wyrm): crystalline frost shatter */
+        {2, 1, 34000,  2000, 64, 32450, 2, 29000, VOICE_FM}, /* 7 Coronation (Seraph): radiant judgment brass */
+        {13, 3, 60000, 16000, 64, 32500, 0, 22000, VOICE_FM} /* 8 Chaos (Demon): meteor impact */
     };
     static const uint8_t NOTES[9] = { 42u, 55u, 64u, 48u, 67u, 73u, 81u, 72u, 38u };
     uint8_t z = zone_get(zone_id)->subgenre_id % 9u;
@@ -212,7 +240,7 @@ void dsp_boss_attack_sfx(uint8_t zone_id)
 
 void dsp_shatter_sfx(void)
 {
-    static const FmPatch SHATTER_PATCH = {9, 4, 52000, 14000, 64, 31800, 0, 31200};
+    static const FmPatch SHATTER_PATCH = {9, 4, 52000, 14000, 64, 31800, 0, 31200, VOICE_FM};
     start_fm_voice(&g_toll, &SHATTER_PATCH, 84u, 28000u, 14u);
     dsp_perc_trigger(1u, 26000u);
 }
@@ -294,6 +322,7 @@ static int32_t render_fm_voice(FmVoice *v, const FmPatch *patch, int32_t grit_bo
                 v->env_q15 = q15_mul(v->env_q15, rel);
                 if (v->env_q15 < 8) {
                     v->env_q15 = 0;
+                    v->lpf_state = 0;
                     v->stage = ENV_OFF;
                     return 0;
                 }
@@ -304,16 +333,99 @@ static int32_t render_fm_voice(FmVoice *v, const FmPatch *patch, int32_t grit_bo
 
     v->phase_c += v->inc_c;
     v->phase_m += v->inc_m;
-
-    int32_t fb = (v->prev_mod * (int32_t)patch->feedback_q15) >> 15;
-    int16_t mod = hal_sine_q15(v->phase_m + ((uint32_t)fb << 15));
-    v->prev_mod = mod;
+    if (v->atk_cnt < 65535u) v->atk_cnt++;
 
     int32_t env2 = (v->env_q15 * v->env_q15) >> 15;
     int32_t mod_idx = (int32_t)patch->mod_index_q15 + grit_boost_q15;
     if (mod_idx > 65535) mod_idx = 65535;
-    int32_t idx = (mod_idx * env2) >> 15;
-    int16_t car = hal_sine_q15(v->phase_c + (uint32_t)((mod * idx) >> 1));
+    int16_t car;
+
+    switch (patch->voice_mode) {
+        case VOICE_PLUCK: {
+            /* Warm woody tri+sine body with bright env^3 plucked string attack + 2.5ms pick click */
+            int32_t env3 = q15_mul(env2, v->env_q15);
+            int32_t body = (tri_q15(v->phase_c) + hal_sine_q15(v->phase_c)) >> 1;
+            int32_t twang = (saw_q15(v->phase_c) + (saw_q15(v->phase_c << 1) >> 1)) >> 1;
+            int32_t raw = body + q15_mul(twang - body, env3);
+            if (patch->feedback_q15 >= 10000u) {
+                /* Sitar/harpsichord twang: crisp upper harmonic sparkle on attack */
+                raw += q15_mul(hal_sine_q15(v->phase_c * 3u) >> 2, env3);
+            }
+            if (v->atk_cnt < 110u) {
+                int32_t pick = (lfsr_noise_q15() * (int32_t)(110u - v->atk_cnt)) >> 9;
+                raw += pick;
+            }
+            int32_t cut = 2600 + (((mod_idx >> 1) * env3) >> 14);
+            if (cut > 26000) cut = 26000;
+            v->lpf_state += q15_mul(raw - v->lpf_state, cut);
+            car = clamp16(v->lpf_state + (v->lpf_state >> 1));
+            break;
+        }
+        case VOICE_WOODWIND: {
+            /* Hollow reed (square+tri) or airy flute (tri+sine) + 20ms breath puff */
+            int32_t tri = tri_q15(v->phase_c);
+            int32_t raw;
+            if (patch->feedback_q15 > 0u) {
+                raw = (sq_q15(v->phase_c) + tri) >> 1;
+            } else {
+                raw = (tri + hal_sine_q15(v->phase_c)) >> 1;
+            }
+            if (v->atk_cnt < 880u) {
+                int32_t breath = (lfsr_noise_q15() * (int32_t)(880u - v->atk_cnt)) >> 12;
+                raw += breath;
+            }
+            int32_t cut = 5200 + (mod_idx >> 2);
+            if (cut > 24000) cut = 24000;
+            v->lpf_state += q15_mul(raw - v->lpf_state, cut);
+            car = clamp16(v->lpf_state + (v->lpf_state >> 2));
+            break;
+        }
+        case VOICE_ANALOG_SAW: {
+            /* Dual slightly detuned sawtooth (+0.39%) through envelope-tracked 1-pole LPF */
+            v->phase_det += v->inc_c + (v->inc_c >> 8);
+            int32_t raw = (saw_q15(v->phase_c) + saw_q15(v->phase_det)) >> 1;
+            if (patch->feedback_q15 >= 10000u) {
+                /* Shred bass / aggressive brass: sub-square body */
+                raw += (v->phase_c < 0x80000000u) ? 4096 : -4096;
+            }
+            int32_t cut = 2600 + (((mod_idx >> 1) * env2) >> 15);
+            if (cut > 26000) cut = 26000;
+            v->lpf_state += q15_mul(raw - v->lpf_state, cut);
+            car = clamp16(v->lpf_state + (v->lpf_state >> 1));
+            break;
+        }
+        case VOICE_ORGAN_CHOIR: {
+            /* Additive drawbar / gothic formant harmonics + subtle cathedral chorus */
+            v->phase_det += v->inc_c + (v->inc_c >> 9);
+            int32_t h1 = hal_sine_q15(v->phase_c);
+            int32_t h2 = hal_sine_q15(v->phase_c << 1);
+            int32_t h3 = hal_sine_q15(v->phase_c * 3u);
+            int32_t h4 = hal_sine_q15(v->phase_c << 2);
+            int32_t raw;
+            if (patch->mod_ratio_num >= 3u) {
+                /* Choir / menacing lead: stronger upper formant harmonics */
+                raw = (h1 * 3 + h2 * 2 + h3 * 2 + h4) >> 3;
+            } else {
+                /* Warm pipe organ drawbars */
+                raw = (h1 * 4 + h2 * 2 + h3 + (h4 >> 1)) >> 3;
+            }
+            raw = (raw * 3 + hal_sine_q15(v->phase_det)) >> 2;
+            int32_t cut = 14000 + (mod_idx >> 3);
+            if (cut > 28000) cut = 28000;
+            v->lpf_state += q15_mul(raw - v->lpf_state, cut);
+            car = clamp16(v->lpf_state + (v->lpf_state >> 2));
+            break;
+        }
+        case VOICE_FM:
+        default: {
+            int32_t fb = (v->prev_mod * (int32_t)patch->feedback_q15) >> 15;
+            int16_t mod = hal_sine_q15(v->phase_m + ((uint32_t)fb << 15));
+            v->prev_mod = mod;
+            int32_t idx = (mod_idx * env2) >> 15;
+            car = hal_sine_q15(v->phase_c + (uint32_t)((mod * idx) >> 1));
+            break;
+        }
+    }
 
     int32_t out = q15_mul(car, v->env_q15);
     return q15_mul(out, v->vel_q15);
@@ -331,10 +443,7 @@ static int32_t render_perc_voice(PercVoice *p, const PercPatch *pp)
     uint32_t car_ph = ((uint32_t)p->phase << 16) + (uint32_t)(mod * (int32_t)pp->fm_index_q15);
     int16_t tone = hal_sine_q15(car_ph);
 
-    uint16_t lsb = g_lfsr & 1u;
-    g_lfsr >>= 1;
-    if (lsb) g_lfsr ^= 0xB400u;
-    int32_t noise = (g_lfsr & 1u) ? 24000 : -24000;
+    int32_t noise = lfsr_noise_q15();
 
     int32_t dry = q15_mul(tone, 32767 - (int32_t)pp->noise_mix_q15)
                 + q15_mul(noise, (int32_t)pp->noise_mix_q15);
@@ -388,22 +497,84 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
 {
     const ZoneDef *z = zone_get(g_state.settings.zone_id);
 
-    /* 1. Atmospheric Backing Chord Pad (Root + 3rd + 5th, Density-sensitive breathing) */
-    g_drone_ph1 += g_drone_inc1;
-    g_drone_ph2 += g_drone_inc2;
-    g_drone_ph3 += g_drone_inc3;
+    /* 1. Zone-Specific Backing Chord Pad (Root + 3rd + 5th, Density-sensitive breathing) */
+    g_drone_ph1  += g_drone_inc1;
+    g_drone_ph1b += g_drone_inc1 + (g_drone_inc1 >> 8);
+    g_drone_ph2  += g_drone_inc2;
+    g_drone_ph3  += g_drone_inc3;
     uint32_t lfo_rate = 17530u + (uint32_t)g_state.settings.density * 350u;
     g_drone_lfo_ph += lfo_rate;
     int32_t lfo_tri = (int16_t)(g_drone_lfo_ph >> 16);
     if (lfo_tri < 0) lfo_tri = -lfo_tri;
     int32_t lfo_gain = 21000 + ((lfo_tri * 11767) >> 15);
 
-    int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 2)) >> 1;
-    int32_t d2 = g_drone_fifth_en ? (hal_sine_q15(g_drone_ph2) >> 1) : 0;
-    int32_t d3 = g_drone_third_en ? (hal_sine_q15(g_drone_ph3) >> 1) : 0;
-    int32_t chord_sum = d1 + d2 + d3;
+    int32_t chord_sum = 0;
+    int32_t drone_cut = 5000 + (int32_t)g_state.settings.harmony * 30;
+    switch (z->drone_mode) {
+        case DRONE_STRINGS: {
+            /* Silky detuned triangle/sine bowed woodland strings (smooth, non-harsh) */
+            int32_t d1 = (tri_q15(g_drone_ph1) + tri_q15(g_drone_ph1b)) >> 2;
+            int32_t d2 = g_drone_fifth_en ? (tri_q15(g_drone_ph2) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? (hal_sine_q15(g_drone_ph3) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            drone_cut = 2800 + ((lfo_tri * 2200) >> 15) + (int32_t)g_state.settings.harmony * 20;
+            break;
+        }
+        case DRONE_GLASS: {
+            /* Crystalline glassy winter pad: pure sine + delicate octave/shimmer overtones */
+            int32_t shimmer = q15_mul(hal_sine_q15(g_drone_ph1b << 1) >> 2, lfo_tri);
+            int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 3) + shimmer) >> 1;
+            int32_t d2 = g_drone_fifth_en ? ((hal_sine_q15(g_drone_ph2) + (hal_sine_q15(g_drone_ph2 << 1) >> 3)) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? ((hal_sine_q15(g_drone_ph3) + (hal_sine_q15(g_drone_ph3 << 1) >> 3)) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            drone_cut = 9000 + (int32_t)g_state.settings.harmony * 35;
+            break;
+        }
+        case DRONE_HURDY: {
+            /* Warm acoustic medieval woody drone (triangle + soft 2x warmth, no brassy buzz) */
+            int32_t d1 = (tri_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 2)) >> 1;
+            int32_t d2 = g_drone_fifth_en ? (tri_q15(g_drone_ph2) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? (hal_sine_q15(g_drone_ph3) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            drone_cut = 4000 + (int32_t)g_state.settings.harmony * 25;
+            break;
+        }
+        case DRONE_BRASS: {
+            /* Warm royal brass chord bed with gentle LFO filter bloom */
+            int32_t d1 = (saw_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 1)) >> 1;
+            int32_t d2 = g_drone_fifth_en ? (saw_q15(g_drone_ph2) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? (saw_q15(g_drone_ph3) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            chord_sum += chord_sum >> 3;
+            drone_cut = 4600 + ((lfo_tri * 4000) >> 15) + (int32_t)g_state.settings.harmony * 35;
+            break;
+        }
+        case DRONE_DARK_SAW: {
+            /* Heavy dark supersaw / arcane pad that opens with Intensity */
+            int32_t sub = (g_drone_ph1 < 0x80000000u) ? 5000 : -5000;
+            int32_t d1 = ((saw_q15(g_drone_ph1) + saw_q15(g_drone_ph1b)) >> 2) + (sub >> 1);
+            int32_t d2 = g_drone_fifth_en ? (saw_q15(g_drone_ph2) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? (saw_q15(g_drone_ph3) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            chord_sum += chord_sum >> 2;
+            int32_t int_open = (g_state.settings.intensity > 50u) ? ((int32_t)(g_state.settings.intensity - 50u) * 60) : 0;
+            drone_cut = 3800 + (int32_t)g_state.settings.harmony * 40 + int_open;
+            break;
+        }
+        case DRONE_ORGAN:
+        default: {
+            /* Cathedral pipe organ drawbar chord bed (1x + 2x + 3x harmonics) */
+            int32_t d1 = (hal_sine_q15(g_drone_ph1) + (hal_sine_q15(g_drone_ph1 << 1) >> 1) + (hal_sine_q15(g_drone_ph1 * 3u) >> 2)) >> 1;
+            int32_t d2 = g_drone_fifth_en ? ((hal_sine_q15(g_drone_ph2) + (hal_sine_q15(g_drone_ph2 << 1) >> 2)) >> 1) : 0;
+            int32_t d3 = g_drone_third_en ? ((hal_sine_q15(g_drone_ph3) + (hal_sine_q15(g_drone_ph3 << 1) >> 2)) >> 1) : 0;
+            chord_sum = d1 + d2 + d3;
+            drone_cut = 6500 + (int32_t)g_state.settings.harmony * 35;
+            break;
+        }
+    }
+    if (drone_cut > 24000) drone_cut = 24000;
     int32_t drone_raw = q15_mul(chord_sum, lfo_gain);
-    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, 5000 + (int32_t)g_state.settings.harmony * 30);
+    g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, drone_cut);
     int32_t drone = g_state.playing ? q15_mul(g_drone_lpf, g_drone_level_q15) : 0;
 
     /* 2. Three-Member Party FM Engine + Toll Voice */

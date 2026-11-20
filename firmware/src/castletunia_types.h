@@ -5,15 +5,33 @@
 #include <stdint.h>
 #include "app_config.h"
 
+typedef enum {
+    DRONE_ORGAN    = 0, /* Pipe organ drawbars (1x + 2x + 3x harmonics) */
+    DRONE_STRINGS  = 1, /* Silky detuned triangle/sine bowed woodland strings */
+    DRONE_HURDY    = 2, /* Warm acoustic medieval woody drone (triangle + soft harmonics) */
+    DRONE_BRASS    = 3, /* Warm royal brass chord bed (filtered saw + 2x harmonic) */
+    DRONE_DARK_SAW = 4, /* Heavy dark supersaw / arcane synth pad with deep LPF */
+    DRONE_GLASS    = 5  /* Crystalline glassy winter pad (pure sine + shimmering octave/bell overtones) */
+} DroneMode;
+
+typedef enum {
+    VOICE_FM          = 0, /* Classic 2-op sine FM (bells, chimes, marimba, sub-bass) */
+    VOICE_PLUCK       = 1, /* Saw/phase-distorted pluck with fast brightness decay + pick transient */
+    VOICE_WOODWIND    = 2, /* Hollow square/triangle reed/flute with filtered attack breath puff */
+    VOICE_ANALOG_SAW  = 3, /* Dual detuned sawtooth with envelope-tracked 1-pole LPF */
+    VOICE_ORGAN_CHOIR = 4  /* Additive drawbar / formant harmonics (1x, 2x, 3x, 4x) */
+} VoiceMode;
+
 typedef struct {
     uint8_t  mod_ratio_num;   /* Modulator ratio numerator (1..8) */
     uint8_t  mod_ratio_den;   /* Modulator ratio denominator (1..8) */
-    uint16_t mod_index_q15;   /* Base FM modulation index (0..65535) */
-    uint16_t feedback_q15;    /* Op2 self-feedback (0..32767) */
+    uint16_t mod_index_q15;   /* Base FM modulation index / LPF brightness (0..65535) */
+    uint16_t feedback_q15;    /* Op2 self-feedback / timbre shape (0..32767) */
     uint16_t attack_samples;  /* Attack envelope duration in samples (64..2000) */
     uint16_t decay_q15;       /* Q15 decay multiplier per sample (30000..32767) */
     uint16_t sustain_q15;     /* Q15 sustain level (0..32767) */
     uint16_t release_q15;     /* Q15 release decay multiplier (28000..32700) */
+    uint8_t  voice_mode;      /* VoiceMode synthesis engine */
 } FmPatch;
 
 typedef struct {
@@ -103,6 +121,7 @@ typedef struct {
 typedef struct {
     const char *name;
     uint8_t     subgenre_id;
+    uint8_t     drone_mode;
     uint8_t     default_bpm;
     uint8_t     scale_semitones[7];
     uint8_t     mid_prog[4];
@@ -177,6 +196,7 @@ typedef struct {
     uint8_t           boss_curse_bars;
     uint8_t           boss_buildup_steps;
     uint8_t           boss_turn_cnt;
+    uint8_t           env_steps;
     uint32_t          status_commit_ms[NUM_PARTY_SLOTS];
     NoteProjectile    note_fx[MAX_SEED_NOTES];
 } CastletuniaState;
