@@ -52,11 +52,11 @@ done
 $CC -DBOARD_SMK37=1 -o "$OUT/ldr_test_smk" tests/ldr_test.c
 run "update loader, SMK-37: app area 0x4000-0x9CFFF, protected ranges untouched" "$OUT/ldr_test_smk" "$OUT/smk_old.fwsc" "$OUT/smk_new.fwsc"
 found=0
-for m in ":SMK-37 Pro_96" "-elite:SMK-37 Elite_96" "-mke:MKE-P37_96"; do
+for m in ":SMK-37 Pro_7420" "-elite:SMK-37 Elite_7420" "-mke:MKE-P37_7420"; do
     for f in build/dinghy*-smk37${m%%:*}.fwsc; do
         [ -f "$f" ] || continue
         found=1
-        v=$(echo "$f" | sed -n 's/.*dinghy-[0-9]\.\([0-9]\).*/\1/p'); v=${v:-0}
+        v=$(echo "$f" | sed -n 's/.*dinghy-\([0-9]\)\.\([0-9]\).*/\1\2/p'); v=${v:-00}
         run "SMK-37 package $f: layout, identity ${m#*:}$v, the loader marker" python3 tests/smk_pkg_test.py "$f" "${m#*:}$v"
     done
 done
