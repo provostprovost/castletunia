@@ -575,7 +575,8 @@ void dsp_render_sample(int32_t *out_l, int32_t *out_r)
     if (drone_cut > 24000) drone_cut = 24000;
     int32_t drone_raw = q15_mul(chord_sum, lfo_gain);
     g_drone_lpf += q15_mul(drone_raw - g_drone_lpf, drone_cut);
-    int32_t drone = g_state.playing ? q15_mul(g_drone_lpf, g_drone_level_q15) : 0;
+    int32_t drone_int = 19660 + ((int32_t)g_state.settings.intensity * 131); /* ~60% -> 100% pad swell */
+    int32_t drone = g_state.playing ? q15_mul(q15_mul(g_drone_lpf, g_drone_level_q15), drone_int) : 0;
 
     /* 2. Three-Member Party FM Engine + Toll Voice */
     int32_t grit = 0;

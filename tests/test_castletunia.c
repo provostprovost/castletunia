@@ -171,9 +171,10 @@ static void run_stage1(void)
     engine_spell_toll();
     assert(spy_toll_count == prev_toll + 1);
 
-    /* 6. Macro control mapping (defaults: 50, 25, 55, 60, 35) */
+    /* 6. Macro control mapping (defaults: 20, 25, 55, 60, 35) */
+    uint8_t prev_int = g_state.settings.intensity;
     engine_adjust_macro(ENC_ALGORITHM, 5, 0);
-    assert(g_state.settings.intensity == 70);
+    assert(g_state.settings.intensity == prev_int + 20u);
     engine_adjust_macro(ENC_KNOB1, 5, 0);
     assert(g_state.settings.drift == 45);
     engine_adjust_macro(ENC_KNOB2, 5, 0);
@@ -199,6 +200,7 @@ static void run_stage1(void)
             assert(g_state.stage_turns <= tgt);
         }
         assert(g_state.stage_turns == tgt);
+        assert(g_state.settings.intensity == 100u);
         /* Tick through buildup (12 steps) + 1 curse bar (16 steps) + 1 victory bar (16 steps) */
         for (int tick = 0; tick < 6 * 16 * 4; tick++) {
             engine_tick_ppqn();
@@ -206,6 +208,7 @@ static void run_stage1(void)
         }
         assert(g_state.settings.zone_id == ((z + 1u) % NUM_ZONES));
         assert(g_state.stage_turns == 0u);
+        assert(g_state.settings.intensity == 20u);
     }
     engine_init_defaults();
     assert(g_state.stage_locked == 0u);

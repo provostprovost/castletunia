@@ -138,7 +138,7 @@ void engine_init_defaults(void)
     g_state.settings.zone_id = start_zone;
     g_state.settings.root_semitone = 2u; /* D */
     g_state.settings.bpm = G_ZONES[start_zone].default_bpm;
-    g_state.settings.intensity = 50u;
+    g_state.settings.intensity = 20u;
     g_state.settings.drift = 25u;
     g_state.settings.density = 55u;
     g_state.settings.harmony = 60u;
@@ -212,6 +212,9 @@ void engine_set_zone(uint8_t zone_id)
         g_state.boss_defeat_timer = 0u;
         g_state.settings.zone_id = z;
         g_state.settings.bpm = G_ZONES[z].default_bpm;
+        if (!g_state.stage_locked) {
+            g_state.settings.intensity = 20u;
+        }
         g_state.dirty_diorama = 1u;
         g_state.dirty_header = 1u;
         char msg[32];
@@ -380,6 +383,16 @@ static void advance_party_turn(void)
     uint8_t target = engine_stage_turn_target(g_state.settings.zone_id);
     if (g_state.stage_turns < target) {
         g_state.stage_turns++;
+    }
+    if (!g_state.stage_locked) {
+        if (g_state.stage_turns >= target) {
+            g_state.settings.intensity = 100u;
+        } else if (g_state.settings.intensity < 100u) {
+            uint8_t rem = (uint8_t)(target - g_state.stage_turns + 1u);
+            uint8_t step_up = (uint8_t)((100u - g_state.settings.intensity + rem - 1u) / rem);
+            uint16_t next_i = (uint16_t)g_state.settings.intensity + step_up;
+            g_state.settings.intensity = (next_i > 100u) ? 100u : (uint8_t)next_i;
+        }
     }
     g_state.dirty_header = 1u;
     if (g_state.slots[0].note_count == 0u || g_state.slots[1].note_count == 0u || g_state.slots[2].note_count == 0u) {
@@ -987,6 +1000,9 @@ static void trigger_slot_step(uint8_t s, uint8_t step)
         } else if (form_bar == 1u || (form_bar == 3u && step >= 12u)) {
             deg = snap_to_chord_gravity(deg, c_root);
         }
+        if (g_state.settings.intensity >= 80u && (pos & 3u) == 0u) {
+            deg += 7; /* High-intensity climax power-octave punch for Fighter */
+        }
     } else if (s == 1u) {
         /* Cleric: 1-note seeds arpeggiate; multi-note phrases answer/cadence with chord on B/C */
         static const int8_t ARP_SHAPES[4][4] = {
@@ -1231,21 +1247,25 @@ void engine_tick_ppqn(void)
         }
         if (inten >= 15u && g_state.settings.mix_perc > 0u) {
             uint16_t low_mask = 0u, high_mask = 0u;
-            if (inten <= 45u) {
-                low_mask = (dens >= 30u) ? z->low_mask_march : (z->low_mask_march & 0x0101u);
-                if (dens >= 40u) high_mask = z->high_mask_march;
-            } else if (inten <= 75u) {
+            if (inten <= 35u) {
+                low_mask = z->low_mask_march & 0x0101u;
+                high_mask = 0u;
+            } else if (inten <= 65u) {
                 low_mask = z->low_mask_march;
-                high_mask = z->high_mask_march;
-                if (dens >= 70u) high_mask |= 0x4444u;
-            } else {
+                if (dens >= 35u) high_mask = z->high_mask_march;
+                if (dens >= 75u) high_mask |= 0x4444u;
+            } else if (inten < 85u) {
                 low_mask = z->low_mask_battle;
                 high_mask = z->high_mask_battle;
-                if ((g_state.bar_count & 3u) == 3u && step >= 12u) {
-                    high_mask |= (uint16_t)(1u << step);
+            } else {
+                low_mask = z->low_mask_battle | 0x0404u; /* Syncopated climax kick pickup */
+                high_mask = z->high_mask_battle;
+                if ((g_state.bar_count & 3u) == 3u) {
+                    /* Bar 4 turnaround fill: broken syncopated burst instead of steady 16ths */
+                    high_mask |= 0x5400u;
                 }
             }
-            if (dens < 25u) high_mask = 0u;
+            if (dens < 20u) high_mask = 0u;
             if (g_state.spells.resolve_armed) {
                 uint8_t sg = z->subgenre_id % 9u;
                 if (sg == 0u) low_mask |= 0x0101u;       /* Crypt Grave Mist: low beat 1 & 3 boom */
@@ -1254,13 +1274,11 @@ void engine_tick_ppqn(void)
                 else if (sg == 7u) high_mask |= 0x5555u; /* Coronation Confetti: snare march */
                 else if (sg == 8u) { low_mask |= 0x5555u; high_mask |= 0x5555u; } /* Boss Embers: double-kick */
             }
-            uint16_t vel = (uint16_t)((uint32_t)g_state.settings.mix_perc * 200u);
+            uint32_t vel_scale = 45u + ((uint32_t)inten * 65u) / 100u; /* 45% -> 110% drum punch */
+            uint32_t v32 = ((uint32_t)g_state.settings.mix_perc * 200u * vel_scale) / 100u;
+            uint16_t vel = (v32 > 32767u) ? 32767u : (uint16_t)v32;
             if (low_mask & (1u << step)) dsp_perc_trigger(0u, vel);
             if (high_mask & (1u << step)) dsp_perc_trigger(1u, vel);
-            if (inten > 75u && (step & 3u) == 0u) {
-                g_state.shake_timer = 2u;
-                g_state.shake_amp = 1u;
-            }
         }
 
         /* Boss Counter-Attack 3-beat drum roll buildup -> beat-timed chord sting & lunge */

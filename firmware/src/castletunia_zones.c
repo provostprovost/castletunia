@@ -47,7 +47,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .low_mask_march  = 0x0909u,
         .high_mask_march = 0x4444u,
         .low_mask_battle = 0x2929u,
-        .high_mask_battle= 0xAAAAu,
+        .high_mask_battle= 0x5490u,
         .toll_patch = {5, 2, 42000, 0, 64, 32745, 0, 32740, VOICE_FM}
     },
     /* Zone 6: THE TUNDRA - Winter Synth */
@@ -215,7 +215,7 @@ const ZoneDef G_ZONES[NUM_ZONES] = {
         .low_mask_march  = 0x1111u,
         .high_mask_march = 0x5555u,
         .low_mask_battle = 0x5555u,
-        .high_mask_battle= 0xFFFFu,
+        .high_mask_battle= 0x5A5Au,
         .toll_patch = {11, 4, 42000, 0, 64, 32745, 0, 32740, VOICE_FM}
     }
 };
